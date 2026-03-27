@@ -104,13 +104,18 @@ class BugCrawler:
             )
 
             if response.status_code != 200:
+                print(f"[Domain {domain_id}] HTTP错误: {response.status_code}")
                 return None
 
             data = response.json()
             if data.get("code") == 200:
-                return data.get("data", {}).get("id")
+                file_id = data.get("data", {}).get("id")
+                print(f"[Domain {domain_id}] file_id: {file_id}")
+                return file_id
+            print(f"[Domain {domain_id}] API错误: {data}")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[Domain {domain_id}] 异常: {e}")
             return None
 
     def query_file_status(self, file_id: int) -> Optional[str]:
@@ -148,8 +153,10 @@ class BugCrawler:
                 verify=False
             )
 
-            if response.status_code != 200:
-                return None
+            # 检查是否返回 JSON（错误响应）
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/json' in content_type:
+                print(f"[文件 {file_id}] 下载返回 JSON，非 Excel，响应: {response.text[:200]}")
 
             return response.content
         except Exception:
