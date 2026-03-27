@@ -111,9 +111,13 @@ class BugCrawler:
                 return None
 
             data = response.json()
-            # 解析响应获取 file_id
-            if data.get("code") == 0 or data.get("success"):
-                return data.get("data", {}).get("file_id")
+            # 解析响应获取 id（file_id）
+            # 响应格式：{"code":200,"message":"Success","data":{"wait":false,"id":2000074}}
+            if data.get("code") == 200:
+                file_id = data.get("data", {}).get("id")
+                print(f"[Domain {domain_id}] 获取到 file_id: {file_id}")
+                return file_id
+            print(f"[Domain {domain_id}] 获取 file_id 失败，响应: {data}")
             return None
         except Exception as e:
             print(f"[Domain {domain_id}] 触发导出异常: {e}")
