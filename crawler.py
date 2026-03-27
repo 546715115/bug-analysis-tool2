@@ -187,19 +187,25 @@ class BugCrawler:
             print(f"[文件 {file_id}] 下载异常: {e}")
             return None
 
-    def wait_and_download(self, file_id: str, domain_id: int = 11, timeout: int = 60) -> Optional[bytes]:
+    def wait_and_download(self, file_id: str, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
         """轮询等待文件就绪后下载"""
         start_time = time.time()
+        print(f"[文件 {file_id}] 开始等待文件生成...")
 
         while time.time() - start_time < timeout:
             status = self.query_file_status(file_id)
-            # 状态可能是 "FILE_STATUS_GENERATED" 或 "ready"
-            if status and ("GENERATED" in status or status == "ready"):
-                print(f"[文件 {file_id}] 文件已就绪，开始下载...")
-                return self.download_file(file_id, domain_id)
-            time.sleep(2)  # 每2秒轮询一次
+            print(f"[文件 {file_id}] 当前状态: {status}")
 
-        print(f"[文件 {file_id}] 等待文件超时")
+            # 只有 "FILE_STATUS_GENERATED" 才算完成（注意不是 BEING_GENERATED）
+            if status == "FILE_STATUS_GENERATED":
+                print(f"[文件 {file_id}] 文件生成完成，开始下载...")
+                return self.download_file(file_id, domain_id)
+
+            # 还在生成中，继续等待
+            print(f"[文件 {file_id}] 文件仍在生成中，等待...")
+            time.sleep(3)  # 每3秒轮询一次
+
+        print(f"[文件 {file_id}] 等待文件超时 (已等待 {timeout} 秒)")
         return None
 
     def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
