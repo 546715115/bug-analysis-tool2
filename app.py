@@ -76,7 +76,7 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     print(f"\n========== 开始获取 Domain {domain_id} ==========")
 
                     # 获取两种条件的数据并合并
-                    # 先获取 with_assigned_domain，等完全结束后再获取 without
+                    # 浏览器只触发一次，我们先试一次
                     data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
                     print(f"[Domain {domain_id}] with_assigned_domain data1: {len(data1) if data1 else 0} bytes")
 
@@ -86,15 +86,7 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     else:
                         df1 = pd.DataFrame()
 
-                    # 等第一次完全结束后再触发第二次
-                    data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
-                    print(f"[Domain {domain_id}] without_assigned_domain data2: {len(data2) if data2 else 0} bytes")
-
-                    if data2:
-                        df2 = load_excel(data2)
-                        print(f"[Domain {domain_id}] df2 行数: {len(df2)}")
-                    else:
-                        df2 = pd.DataFrame()
+                    df2 = pd.DataFrame()
 
                     df1 = load_excel(data1) if data1 else pd.DataFrame()
                     df2 = load_excel(data2) if data2 else pd.DataFrame()
