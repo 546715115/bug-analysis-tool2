@@ -25,7 +25,17 @@ CHINESE_TO_ENGLISH = {v: k for k, v in FIELD_MAPPING.items()}
 def load_excel(file_bytes: bytes) -> pd.DataFrame:
     """读取 Excel 文件，返回 DataFrame"""
     try:
-        df = pd.read_excel(BytesIO(file_bytes))
+        from openpyxl import load_workbook
+        # 先检查 Excel 结构
+        wb = load_workbook(BytesIO(file_bytes))
+        print(f"Excel sheet 列表: {wb.sheetnames}")
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            print(f"Sheet '{sheet_name}' 行数: {ws.max_row}, 列数: {ws.max_column}")
+
+        # 读取数据，默认取第一个 sheet
+        df = pd.read_excel(BytesIO(file_bytes), sheet_name=0)
+        print(f"读取到 {len(df)} 行, 列: {list(df.columns)[:5]}...")
         return df
     except Exception as e:
         print(f"读取 Excel 失败: {e}")
