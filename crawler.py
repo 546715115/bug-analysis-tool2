@@ -144,73 +144,28 @@ class BugCrawler:
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
-        """下载 Excel 文件，尝试不同的接口、参数和请求方式"""
-        base_urls = [
-            f"{self.base_url}/vision-excel/api/query/issue/download_item",
-            f"{self.base_url}/vision-excel/api/export/download",
-        ]
-
-        params_list = [
-            f"id={file_id}&domain_id={domain_id}&type=issue_list",
-            f"id={file_id}&domain_id={domain_id}",
-            f"fileId={file_id}&domain_id={domain_id}",
-            f"recordId={file_id}&domain_id={domain_id}",
-        ]
-
-        # 尝试 GET
-        for base_url in base_urls:
-            for params in params_list:
-                url = f"{base_url}?{params}&requestTag={int(time.time() * 1000)}"
-                print(f"[文件 {file_id}] GET: {url}")
-                try:
-                    response = self.session.get(
-                        url,
-                        headers=self._get_headers(),
-                        timeout=60,
-                        verify=False
-                    )
-
-                    content_type = response.headers.get('Content-Type', '')
-                    if 'application/json' in content_type:
-                        print(f"  -> JSON")
-                        continue
-
-                    if response.content.startswith(b'PK') or 'application/vnd' in content_type:
-                        print(f"  -> 成功! 大小: {len(response.content)}")
-                        return response.content
-                except Exception as e:
-                    print(f"  -> 异常: {e}")
-                    continue
-
-        # 尝试 POST
-        post_urls = [
-            f"{self.base_url}/vision-excel/api/query/issue/download_item",
-        ]
-        for post_url in post_urls:
-            for params in params_list:
-                url = f"{post_url}?{params}&requestTag={int(time.time() * 1000)}"
-                print(f"[文件 {file_id}] POST: {url}")
-                try:
-                    response = self.session.post(
-                        url,
-                        headers=self._get_headers(),
-                        timeout=60,
-                        verify=False
-                    )
-
-                    content_type = response.headers.get('Content-Type', '')
-                    if 'application/json' in content_type:
-                        print(f"  -> JSON")
-                        continue
-
-                    if response.content.startswith(b'PK') or 'application/vnd' in content_type:
-                        print(f"  -> 成功! 大小: {len(response.content)}")
-                        return response.content
-                except Exception as e:
-                    print(f"  -> 异常: {e}")
-                    continue
-
-        return None
+        """下载 Excel 文件"""
+        url = f"{self.base_url}/vision-excel/api/download/workitem?id={file_id}"
+        print(f"[文件 {file_id}] 尝试: {url}")
+        try:
+            response = self.session.get(
+                url,
+                headers=self._get_headers(),
+                timeout=60,
+                verify=False
+            )
+            ct = response.headers.get('Content-Type', '')
+            print(f"[文件 {file_id}] Content-Type: {ct}, 大小: {len(response.content)}")
+            if 'application/json' in ct:
+                print(f"[文件 {file_id}] 返回 JSON: {response.text[:200]}")
+                return None
+            if response.content.startswith(b'PK') or 'application/vnd' in ct:
+                print(f"[文件 {file_id}] 成功获取 Excel!")
+                return response.content
+            return response.content
+        except Exception as e:
+            print(f"[文件 {file_id}] 异常: {e}")
+            return None
 
     def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
         """轮询等待文件就绪后下载"""
@@ -226,47 +181,10 @@ class BugCrawler:
             print(f"[文件 {file_id}] 状态: {status}")
 
             if status == "FILE_STATUS_GENERATED":
-                # 尝试用 file_name 下载
-                file_name = result.get("file_name")
-                if file_name:
-                    print(f"[文件 {file_id}] 尝试用 file_name 下载: {file_name}")
-                    data = self.download_by_filename(file_name, domain_id)
-                    if data:
-                        return data
                 return self.download_file(file_id, domain_id)
 
             time.sleep(3)
 
-        return None
-
-    def download_by_filename(self, file_name: str, domain_id: int) -> Optional[bytes]:
-        """通过 file_name 下载文件"""
-        # file_name 格式: '30021002Domain 11Issue2026-03-28-1774630591695.xlsx'
-        # 尝试多种 URL 组合
-        urls = [
-            f"{self.base_url}/vision-excel/api/query/issue/download_item?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
-            f"{self.base_url}/vision-excel/api/export/download?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
-            f"{self.base_url}/vision-excel/api/download?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
-        ]
-        for url in urls:
-            print(f"[文件名下载] GET: {url}")
-            try:
-                response = self.session.get(
-                    url,
-                    headers=self._get_headers(),
-                    timeout=60,
-                    verify=False
-                )
-                ct = response.headers.get('Content-Type', '')
-                if 'application/json' in ct:
-                    print(f"  -> JSON")
-                    continue
-                if response.content.startswith(b'PK') or 'application/vnd' in ct:
-                    print(f"  -> 成功! 大小: {len(response.content)}")
-                    return response.content
-            except Exception as e:
-                print(f"  -> 异常: {e}")
-                continue
         return None
 
     def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
