@@ -88,11 +88,6 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
 
                     df2 = pd.DataFrame()
 
-                    df1 = load_excel(data1) if data1 else pd.DataFrame()
-                    df2 = load_excel(data2) if data2 else pd.DataFrame()
-
-                    print(f"[Domain {domain_id}] df1 行数: {len(df1)}, df2 行数: {len(df2)}")
-
                     merged = merge_data(df1, df2)
                     print(f"[Domain {domain_id}] 合并后行数: {len(merged)}")
 
