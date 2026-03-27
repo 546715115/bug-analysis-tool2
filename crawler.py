@@ -144,25 +144,44 @@ class BugCrawler:
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
-        """下载 Excel 文件"""
-        url = f"{self.base_url}/vision-excel/api/query/issue/download_item?id={file_id}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
+        """下载 Excel 文件，尝试不同的接口路径和参数"""
+        base_urls = [
+            f"{self.base_url}/vision-excel/api/query/issue/download_item",
+            f"{self.base_url}/vision-excel/api/export/download",
+        ]
 
-        try:
-            response = self.session.get(
-                url,
-                headers=self._get_headers(),
-                timeout=60,
-                verify=False
-            )
+        # query 返回里有 type: 'issue_list'
+        params_list = [
+            f"id={file_id}&domain_id={domain_id}&type=issue_list",
+            f"id={file_id}&domain_id={domain_id}",
+            f"fileId={file_id}&domain_id={domain_id}",
+        ]
 
-            # 检查是否返回 JSON（错误响应）
-            content_type = response.headers.get('Content-Type', '')
-            if 'application/json' in content_type:
-                print(f"[文件 {file_id}] 下载返回 JSON，非 Excel，响应: {response.text[:200]}")
+        for base_url in base_urls:
+            for params in params_list:
+                url = f"{base_url}?{params}&requestTag={int(time.time() * 1000)}"
+                print(f"[文件 {file_id}] 尝试: {url}")
+                try:
+                    response = self.session.get(
+                        url,
+                        headers=self._get_headers(),
+                        timeout=60,
+                        verify=False
+                    )
 
-            return response.content
-        except Exception:
-            return None
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'application/json' in content_type:
+                        print(f"  -> 返回 JSON: {response.text[:150]}")
+                        continue
+
+                    if response.content.startswith(b'PK') or 'application/vnd' in content_type:
+                        print(f"  -> 成功获取 Excel，大小: {len(response.content)} bytes")
+                        return response.content
+                except Exception as e:
+                    print(f"  -> 异常: {e}")
+                    continue
+
+        return None
 
     def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
         """轮询等待文件就绪后下载"""
