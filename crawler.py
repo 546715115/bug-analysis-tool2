@@ -118,8 +118,8 @@ class BugCrawler:
             print(f"[Domain {domain_id}] 异常: {e}")
             return None
 
-    def query_file_status(self, file_id: int) -> Optional[str]:
-        """查询文件状态"""
+    def query_file_status(self, file_id: int) -> Optional[dict]:
+        """查询文件状态，返回完整响应以便调试"""
         url = f"{self.base_url}/vision-excel/api/query/file_download_record?requestTag={int(time.time() * 1000)}"
 
         try:
@@ -132,13 +132,15 @@ class BugCrawler:
             )
             response.raise_for_status()
             data = response.json()
+            print(f"[文件 {file_id}] 查询完整响应: {data}")
 
             if data.get("code") == 200:
                 result = data.get("data", {}).get("result", [])
                 if result:
-                    return result[0].get("status")
+                    return result[0]
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[文件 {file_id}] 查询异常: {e}")
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
@@ -167,14 +169,40 @@ class BugCrawler:
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            status = self.query_file_status(file_id)
+            result = self.query_file_status(file_id)
+            if not result:
+                time.sleep(3)
+                continue
+
+            status = result.get("status")
+            print(f"[文件 {file_id}] 状态: {status}")
 
             if status == "FILE_STATUS_GENERATED":
+                # 检查是否有 url 字段用于下载
+                download_url = result.get("url")
+                if download_url:
+                    print(f"[文件 {file_id}] 使用响应中的 URL 下载: {download_url}")
+                    return self.download_file_by_url(download_url)
                 return self.download_file(file_id, domain_id)
 
             time.sleep(3)
 
         return None
+
+    def download_file_by_url(self, url: str) -> Optional[bytes]:
+        """通过 URL 下载文件"""
+        try:
+            response = self.session.get(
+                url,
+                headers=self._get_headers(),
+                timeout=60,
+                verify=False
+            )
+            if response.status_code == 200:
+                return response.content
+            return None
+        except Exception:
+            return None
 
     def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
         """完整流程：触发导出 → 等待 → 下载"""
