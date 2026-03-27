@@ -155,6 +155,7 @@ class BugCrawler:
     def download_file(self, file_id: str, domain_id: int = 11) -> Optional[bytes]:
         """下载 Excel 文件"""
         url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
+        print(f"[文件 {file_id}] 开始下载... URL: {url}")
 
         try:
             response = self.session.get(
@@ -163,10 +164,27 @@ class BugCrawler:
                 timeout=60,
                 verify=False  # 禁用 SSL 证书验证
             )
-            response.raise_for_status()
+            print(f"[文件 {file_id}] 下载响应状态: {response.status_code}")
+            print(f"[文件 {file_id}] 下载内容类型: {response.headers.get('Content-Type', 'unknown')}")
+            print(f"[文件 {file_id}] 下载内容长度: {len(response.content)} bytes")
+
+            if response.status_code != 200:
+                print(f"[文件 {file_id}] HTTP 错误: {response.status_code}")
+                print(f"[文件 {file_id}] 响应内容: {response.text[:200] if response.text else 'empty'}")
+                return None
+
+            # 检查内容是否是 Excel 文件
+            content_type = response.headers.get('Content-Type', '')
+            if 'application/vnd' in content_type or 'application/octet-stream' in content_type:
+                print(f"[文件 {file_id}] 确认是 Excel 文件")
+            elif response.content.startswith(b'PK'):
+                print(f"[文件 {file_id}] 确认是 ZIP/Excel 文件 (PK header)")
+            else:
+                print(f"[文件 {file_id}] 警告: 内容类型可能不是 Excel")
+
             return response.content
         except Exception as e:
-            print(f"下载文件失败: {e}")
+            print(f"[文件 {file_id}] 下载异常: {e}")
             return None
 
     def wait_and_download(self, file_id: str, domain_id: int = 11, timeout: int = 60) -> Optional[bytes]:

@@ -73,30 +73,47 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                 all_dfs = []
                 for domain_id in domain_ids:
                     st.sidebar.info(f"正在获取 Domain {domain_id}...")
+                    print(f"\n========== 开始获取 Domain {domain_id} ==========")
+
                     # 获取两种条件的数据并合并
                     data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
+                    print(f"[Domain {domain_id}] with_assigned_domain data1: {len(data1) if data1 else 0} bytes")
+
                     data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
+                    print(f"[Domain {domain_id}] without_assigned_domain data2: {len(data2) if data2 else 0} bytes")
 
                     df1 = load_excel(data1) if data1 else pd.DataFrame()
                     df2 = load_excel(data2) if data2 else pd.DataFrame()
 
+                    print(f"[Domain {domain_id}] df1 行数: {len(df1)}, df2 行数: {len(df2)}")
+
                     merged = merge_data(df1, df2)
+                    print(f"[Domain {domain_id}] 合并后行数: {len(merged)}")
+
                     if not merged.empty:
                         merged["_source_domain"] = domain_id  # 标记数据来源
                         all_dfs.append(merged)
+                        print(f"[Domain {domain_id}] 添加到结果集")
+                    else:
+                        print(f"[Domain {domain_id}] 警告: 数据为空")
 
                 if all_dfs:
                     df_raw = pd.concat(all_dfs, ignore_index=True)
+                    print(f"\n所有 Domain 合并后总行数: {len(df_raw)}")
+
                     df_raw = normalize_columns(df_raw)
+                    print(f"标准化列名后列名: {list(df_raw.columns)}")
 
                     st.session_state.df_raw = df_raw
 
                     # 获取版本列表
                     st.session_state.versions = get_version_list(df_raw)
+                    print(f"发现版本列表: {st.session_state.versions}")
                     st.session_state.selected_version = "全部"
 
                     st.sidebar.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
                 else:
+                    print("错误: 所有 Domain 数据都为空")
                     st.sidebar.error("获取数据失败，请检查认证信息")
 
 st.sidebar.divider()
