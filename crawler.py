@@ -69,7 +69,7 @@ class BugCrawler:
 
         return {
             "source_id": domain_id,
-            "source_title": f"Domain {domain_id}",
+            "source_title": "Cloud Eye",
             "source_type": "Domain",
             "language": "zh",
             "exportSize": 120,
@@ -83,7 +83,7 @@ class BugCrawler:
                 "created_time", "ISSUE_STATUS_SUBMIT", "ISSUE_STATUS_ANALYSIS",
                 "ISSUE_STAGE_PLANNING", "ISSUE_STATUS_FIXING", "ISSUE_STAGE_CODE",
                 "ISSUE_STAGE_TEST", "ISSUE_STAGE_DONE", "ISSUE_STATUS_VERIFYING",
-                "ISSUE_STATUS_RETURNED", "remark", "dev_person", "delivery_scenario", "from_version"
+                "ISSUE_STATUS_RETURNED", "remark"
             ],
             "request_tag": request_tag,
             "fieldId": [1, 2, 4, 5, 6, 7, 264, 9, 11, 12, 14, 15, 17, 18, 19, 24, 263, 27, 34, 268, 67, 68, 48, 39, 40, 41, 42, 43, 44, 45, 46, 47, 474]
@@ -104,22 +104,17 @@ class BugCrawler:
             )
 
             if response.status_code != 200:
-                print(f"[Domain {domain_id}] HTTP错误: {response.status_code}")
                 return None
 
             data = response.json()
             if data.get("code") == 200:
-                file_id = data.get("data", {}).get("id")
-                print(f"[Domain {domain_id}] file_id: {file_id}")
-                return file_id
-            print(f"[Domain {domain_id}] API错误: {data}")
+                return data.get("data", {}).get("id")
             return None
-        except Exception as e:
-            print(f"[Domain {domain_id}] 异常: {e}")
+        except Exception:
             return None
 
-    def query_file_status(self, file_id: int) -> Optional[dict]:
-        """查询文件状态，返回完整响应以便调试"""
+    def query_file_status(self, file_id: int) -> Optional[str]:
+        """查询文件状态"""
         url = f"{self.base_url}/vision-excel/api/query/file_download_record?requestTag={int(time.time() * 1000)}"
 
         try:
@@ -132,21 +127,18 @@ class BugCrawler:
             )
             response.raise_for_status()
             data = response.json()
-            print(f"[文件 {file_id}] 查询完整响应: {data}")
 
             if data.get("code") == 200:
                 result = data.get("data", {}).get("result", [])
                 if result:
-                    return result[0]
+                    return result[0].get("status")
             return None
-        except Exception as e:
-            print(f"[文件 {file_id}] 查询异常: {e}")
+        except Exception:
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
         """下载 Excel 文件"""
         url = f"{self.base_url}/vision-excel/api/download/workitem?id={file_id}"
-        print(f"[文件 {file_id}] 尝试: {url}")
         try:
             response = self.session.get(
                 url,
@@ -154,17 +146,10 @@ class BugCrawler:
                 timeout=60,
                 verify=False
             )
-            ct = response.headers.get('Content-Type', '')
-            print(f"[文件 {file_id}] Content-Type: {ct}, 大小: {len(response.content)}")
-            if 'application/json' in ct:
-                print(f"[文件 {file_id}] 返回 JSON: {response.text[:200]}")
-                return None
-            if response.content.startswith(b'PK') or 'application/vnd' in ct:
-                print(f"[文件 {file_id}] 成功获取 Excel!")
+            if response.status_code == 200 and not response.content.startswith(b'<'):
                 return response.content
-            return response.content
-        except Exception as e:
-            print(f"[文件 {file_id}] 异常: {e}")
+            return None
+        except Exception:
             return None
 
     def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
@@ -172,13 +157,7 @@ class BugCrawler:
         start_time = time.time()
 
         while time.time() - start_time < timeout:
-            result = self.query_file_status(file_id)
-            if not result:
-                time.sleep(3)
-                continue
-
-            status = result.get("status")
-            print(f"[文件 {file_id}] 状态: {status}")
+            status = self.query_file_status(file_id)
 
             if status == "FILE_STATUS_GENERATED":
                 return self.download_file(file_id, domain_id)
