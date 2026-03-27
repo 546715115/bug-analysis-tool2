@@ -5,10 +5,21 @@ from typing import Dict, Optional
 from config import BASE_URL, get_default_headers, build_auth_headers
 
 class BugCrawler:
-    def __init__(self, auth_config: Dict[str, str]):
+    def __init__(self, auth_config: Dict[str, str], domain_ids: list = None):
         self.base_url = BASE_URL
         self.auth = auth_config
         self.session = requests.Session()
+        # 默认支持 domain 11 和 33921，可配置
+        self.domain_ids = domain_ids or [11, 33921]
+
+    def fetch_all_domains(self) -> Optional[bytes]:
+        """爬取所有 domain 的数据并合并"""
+        all_data = []
+        for domain_id in self.domain_ids:
+            data = self.fetch_data(domain_id)
+            if data:
+                all_data.append(data)
+        return all_data if all_data else None
 
     def _get_headers(self) -> Dict[str, str]:
         """获取认证请求头"""
@@ -18,7 +29,7 @@ class BugCrawler:
             user_id=self.auth.get("x_titan_userid", "")
         )
 
-    def build_export_payload(self, source_type: str = "with_assigned_domain") -> Dict:
+    def build_export_payload(self, domain_id: int, source_type: str = "with_assigned_domain") -> Dict:
         """构建导出请求体"""
         request_tag = str(int(time.time() * 1000))
 
@@ -29,7 +40,7 @@ class BugCrawler:
             ],
             "filters": [
                 {"key": "scene", "operator": "||", "value": ["issue_bug"]},
-                {"key": "current_domain", "operator": "||", "value": [11]},
+                {"key": "current_domain", "operator": "||", "value": [domain_id]},
                 {"key": "status", "operator": "||", "value": [
                     "ISSUE_STATUS_SUBMIT",
                     "ISSUE_STATUS_ANALYSIS",
@@ -47,14 +58,14 @@ class BugCrawler:
 
         if source_type == "with_assigned_domain":
             base_conditions["assigned_domain"] = {
-                "value": [{"id": 11, "type": "Domain"}],
+                "value": [{"id": domain_id, "type": "Domain"}],
                 "operator": "||",
                 "convolution": "down"
             }
 
         return {
-            "source_id": 11,
-            "source_title": "Cloud Eye",
+            "source_id": domain_id,
+            "source_title": f"Domain {domain_id}",
             "source_type": "Domain",
             "language": "zh",
             "exportSize": 120,
@@ -74,10 +85,10 @@ class BugCrawler:
             "fieldId": [1, 2, 4, 5, 6, 7, 264, 9, 11, 12, 14, 15, 17, 18, 19, 24, 263, 27, 34, 268, 67, 68, 48, 39, 40, 41, 42, 43, 44, 45, 46, 47, 474]
         }
 
-    def trigger_export(self, source_type: str = "with_assigned_domain") -> Optional[str]:
+    def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[str]:
         """触发导出，返回 file_id"""
         url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
-        payload = self.build_export_payload(source_type)
+        payload = self.build_export_payload(domain_id, source_type)
 
         try:
             response = self.session.post(
@@ -118,9 +129,9 @@ class BugCrawler:
             print(f"查询文件状态失败: {e}")
             return None
 
-    def download_file(self, file_id: str) -> Optional[bytes]:
+    def download_file(self, file_id: str, domain_id: int = 11) -> Optional[bytes]:
         """下载 Excel 文件"""
-        url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id=11&requestTag={int(time.time() * 1000)}"
+        url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
 
         try:
             response = self.session.get(
@@ -134,24 +145,24 @@ class BugCrawler:
             print(f"下载文件失败: {e}")
             return None
 
-    def wait_and_download(self, file_id: str, timeout: int = 60) -> Optional[bytes]:
+    def wait_and_download(self, file_id: str, domain_id: int = 11, timeout: int = 60) -> Optional[bytes]:
         """轮询等待文件就绪后下载"""
         start_time = time.time()
 
         while time.time() - start_time < timeout:
             status = self.query_file_status(file_id)
             if status == "ready":
-                return self.download_file(file_id)
+                return self.download_file(file_id, domain_id)
             time.sleep(2)  # 每2秒轮询一次
 
         print("等待文件超时")
         return None
 
-    def fetch_data(self, source_type: str = "with_assigned_domain") -> Optional[bytes]:
+    def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
         """完整流程：触发导出 → 等待 → 下载"""
-        file_id = self.trigger_export(source_type)
+        file_id = self.trigger_export(domain_id, source_type)
         if not file_id:
-            print("获取 file_id 失败")
+            print(f"获取 file_id 失败 (domain {domain_id})")
             return None
 
-        return self.wait_and_download(file_id)
+        return self.wait_and_download(file_id, domain_id)

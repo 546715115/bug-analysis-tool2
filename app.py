@@ -38,6 +38,16 @@ user_id = st.sidebar.text_input("x-titan-userid", value="", help="用户 ID")
 
 st.sidebar.divider()
 
+# Domain 配置
+st.sidebar.subheader("Domain 配置")
+domain_input = st.sidebar.text_input(
+    "Domain ID 列表",
+    value="11, 33921",
+    help="多个 Domain 用逗号分隔，如: 11, 33921"
+)
+
+st.sidebar.divider()
+
 if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=True):
     if not cookie or not authorization or not user_id:
         st.sidebar.error("请填写完整的认证信息")
@@ -49,28 +59,45 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                 "x_titan_userid": user_id
             }
 
-            crawler = BugCrawler(auth_config)
+            # 解析 domain IDs
+            try:
+                domain_ids = [int(d.strip()) for d in domain_input.split(",") if d.strip()]
+            except ValueError:
+                st.sidebar.error("Domain ID 格式错误，请输入数字，用逗号分隔")
+                domain_ids = []
 
-            # 获取两个 URL 的数据
-            data1 = crawler.fetch_data("with_assigned_domain")
-            data2 = crawler.fetch_data("without_assigned_domain")
+            if domain_ids:
+                crawler = BugCrawler(auth_config, domain_ids=domain_ids)
 
-            if data1 or data2:
-                df1 = load_excel(data1) if data1 else pd.DataFrame()
-                df2 = load_excel(data2) if data2 else pd.DataFrame()
+                # 获取所有 domain 的数据
+                all_dfs = []
+                for domain_id in domain_ids:
+                    st.sidebar.info(f"正在获取 Domain {domain_id}...")
+                    # 获取两种条件的数据并合并
+                    data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
+                    data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
 
-                df_raw = merge_data(df1, df2)
-                df_raw = normalize_columns(df_raw)
+                    df1 = load_excel(data1) if data1 else pd.DataFrame()
+                    df2 = load_excel(data2) if data2 else pd.DataFrame()
 
-                st.session_state.df_raw = df_raw
+                    merged = merge_data(df1, df2)
+                    if not merged.empty:
+                        merged["_source_domain"] = domain_id  # 标记数据来源
+                        all_dfs.append(merged)
 
-                # 获取版本列表
-                st.session_state.versions = get_version_list(df_raw)
-                st.session_state.selected_version = "全部"
+                if all_dfs:
+                    df_raw = pd.concat(all_dfs, ignore_index=True)
+                    df_raw = normalize_columns(df_raw)
 
-                st.sidebar.success(f"成功获取 {len(df_raw)} 条问题单")
-            else:
-                st.sidebar.error("获取数据失败，请检查认证信息")
+                    st.session_state.df_raw = df_raw
+
+                    # 获取版本列表
+                    st.session_state.versions = get_version_list(df_raw)
+                    st.session_state.selected_version = "全部"
+
+                    st.sidebar.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
+                else:
+                    st.sidebar.error("获取数据失败，请检查认证信息")
 
 st.sidebar.divider()
 
