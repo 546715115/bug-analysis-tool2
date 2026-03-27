@@ -144,23 +144,24 @@ class BugCrawler:
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
-        """下载 Excel 文件，尝试不同的接口路径和参数"""
+        """下载 Excel 文件，尝试不同的接口、参数和请求方式"""
         base_urls = [
             f"{self.base_url}/vision-excel/api/query/issue/download_item",
             f"{self.base_url}/vision-excel/api/export/download",
         ]
 
-        # query 返回里有 type: 'issue_list'
         params_list = [
             f"id={file_id}&domain_id={domain_id}&type=issue_list",
             f"id={file_id}&domain_id={domain_id}",
             f"fileId={file_id}&domain_id={domain_id}",
+            f"recordId={file_id}&domain_id={domain_id}",
         ]
 
+        # 尝试 GET
         for base_url in base_urls:
             for params in params_list:
                 url = f"{base_url}?{params}&requestTag={int(time.time() * 1000)}"
-                print(f"[文件 {file_id}] 尝试: {url}")
+                print(f"[文件 {file_id}] GET: {url}")
                 try:
                     response = self.session.get(
                         url,
@@ -171,11 +172,39 @@ class BugCrawler:
 
                     content_type = response.headers.get('Content-Type', '')
                     if 'application/json' in content_type:
-                        print(f"  -> 返回 JSON: {response.text[:150]}")
+                        print(f"  -> JSON")
                         continue
 
                     if response.content.startswith(b'PK') or 'application/vnd' in content_type:
-                        print(f"  -> 成功获取 Excel，大小: {len(response.content)} bytes")
+                        print(f"  -> 成功! 大小: {len(response.content)}")
+                        return response.content
+                except Exception as e:
+                    print(f"  -> 异常: {e}")
+                    continue
+
+        # 尝试 POST
+        post_urls = [
+            f"{self.base_url}/vision-excel/api/query/issue/download_item",
+        ]
+        for post_url in post_urls:
+            for params in params_list:
+                url = f"{post_url}?{params}&requestTag={int(time.time() * 1000)}"
+                print(f"[文件 {file_id}] POST: {url}")
+                try:
+                    response = self.session.post(
+                        url,
+                        headers=self._get_headers(),
+                        timeout=60,
+                        verify=False
+                    )
+
+                    content_type = response.headers.get('Content-Type', '')
+                    if 'application/json' in content_type:
+                        print(f"  -> JSON")
+                        continue
+
+                    if response.content.startswith(b'PK') or 'application/vnd' in content_type:
+                        print(f"  -> 成功! 大小: {len(response.content)}")
                         return response.content
                 except Exception as e:
                     print(f"  -> 异常: {e}")
@@ -197,31 +226,48 @@ class BugCrawler:
             print(f"[文件 {file_id}] 状态: {status}")
 
             if status == "FILE_STATUS_GENERATED":
-                # 检查是否有 url 字段用于下载
-                download_url = result.get("url")
-                if download_url:
-                    print(f"[文件 {file_id}] 使用响应中的 URL 下载: {download_url}")
-                    return self.download_file_by_url(download_url)
+                # 尝试用 file_name 下载
+                file_name = result.get("file_name")
+                if file_name:
+                    print(f"[文件 {file_id}] 尝试用 file_name 下载: {file_name}")
+                    data = self.download_by_filename(file_name, domain_id)
+                    if data:
+                        return data
                 return self.download_file(file_id, domain_id)
 
             time.sleep(3)
 
         return None
 
-    def download_file_by_url(self, url: str) -> Optional[bytes]:
-        """通过 URL 下载文件"""
-        try:
-            response = self.session.get(
-                url,
-                headers=self._get_headers(),
-                timeout=60,
-                verify=False
-            )
-            if response.status_code == 200:
-                return response.content
-            return None
-        except Exception:
-            return None
+    def download_by_filename(self, file_name: str, domain_id: int) -> Optional[bytes]:
+        """通过 file_name 下载文件"""
+        # file_name 格式: '30021002Domain 11Issue2026-03-28-1774630591695.xlsx'
+        # 尝试多种 URL 组合
+        urls = [
+            f"{self.base_url}/vision-excel/api/query/issue/download_item?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
+            f"{self.base_url}/vision-excel/api/export/download?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
+            f"{self.base_url}/vision-excel/api/download?file_name={file_name}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}",
+        ]
+        for url in urls:
+            print(f"[文件名下载] GET: {url}")
+            try:
+                response = self.session.get(
+                    url,
+                    headers=self._get_headers(),
+                    timeout=60,
+                    verify=False
+                )
+                ct = response.headers.get('Content-Type', '')
+                if 'application/json' in ct:
+                    print(f"  -> JSON")
+                    continue
+                if response.content.startswith(b'PK') or 'application/vnd' in ct:
+                    print(f"  -> 成功! 大小: {len(response.content)}")
+                    return response.content
+            except Exception as e:
+                print(f"  -> 异常: {e}")
+                continue
+        return None
 
     def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
         """完整流程：触发导出 → 等待 → 下载"""
