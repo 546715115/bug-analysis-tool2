@@ -102,14 +102,21 @@ class BugCrawler:
                 timeout=30,
                 verify=False  # 禁用 SSL 证书验证（公司内网环境）
             )
-            response.raise_for_status()
+            # 打印响应状态和内容用于调试
+            print(f"[Domain {domain_id}] 响应状态: {response.status_code}")
+            print(f"[Domain {domain_id}] 响应内容: {response.text[:500] if response.text else 'empty'}")
+
+            if response.status_code != 200:
+                print(f"[Domain {domain_id}] HTTP 错误: {response.status_code}")
+                return None
+
             data = response.json()
             # 解析响应获取 file_id
             if data.get("code") == 0 or data.get("success"):
                 return data.get("data", {}).get("file_id")
             return None
         except Exception as e:
-            print(f"触发导出失败: {e}")
+            print(f"[Domain {domain_id}] 触发导出异常: {e}")
             return None
 
     def query_file_status(self, file_id: int) -> Optional[str]:
