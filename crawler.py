@@ -1,8 +1,12 @@
 # crawler.py
 import time
 import requests
+import urllib3
 from typing import Dict, Optional
 from config import BASE_URL, get_default_headers, build_auth_headers
+
+# 禁用 SSL 证书警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class BugCrawler:
     def __init__(self, auth_config: Dict[str, str], domain_ids: list = None):
@@ -95,7 +99,8 @@ class BugCrawler:
                 url,
                 json=payload,
                 headers=self._get_headers(),
-                timeout=30
+                timeout=30,
+                verify=False  # 禁用 SSL 证书验证（公司内网环境）
             )
             response.raise_for_status()
             data = response.json()
@@ -116,7 +121,8 @@ class BugCrawler:
                 url,
                 json={"filters": [{"key": "id", "operator": "||", "value": [file_id]}]},
                 headers=self._get_headers(),
-                timeout=30
+                timeout=30,
+                verify=False  # 禁用 SSL 证书验证
             )
             response.raise_for_status()
             data = response.json()
@@ -137,7 +143,8 @@ class BugCrawler:
             response = self.session.get(
                 url,
                 headers=self._get_headers(),
-                timeout=60
+                timeout=60,
+                verify=False  # 禁用 SSL 证书验证
             )
             response.raise_for_status()
             return response.content
