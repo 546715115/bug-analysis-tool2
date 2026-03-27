@@ -138,10 +138,12 @@ class BugCrawler:
             response.raise_for_status()
             data = response.json()
             print(f"[文件 {file_id}] 查询状态响应: {data}")
-            if data.get("code") == 0:
-                records = data.get("data", [])
-                if records:
-                    status = records[0].get("status")
+
+            # 响应结构: {"code":200, "data": {"result": [{...}]}}
+            if data.get("code") == 200:
+                result = data.get("data", {}).get("result", [])
+                if result:
+                    status = result[0].get("status")
                     print(f"[文件 {file_id}] 状态: {status}")
                     return status
             print(f"[文件 {file_id}] 未找到记录或状态为空")
@@ -173,11 +175,13 @@ class BugCrawler:
 
         while time.time() - start_time < timeout:
             status = self.query_file_status(file_id)
-            if status == "ready":
+            # 状态可能是 "FILE_STATUS_GENERATED" 或 "ready"
+            if status and ("GENERATED" in status or status == "ready"):
+                print(f"[文件 {file_id}] 文件已就绪，开始下载...")
                 return self.download_file(file_id, domain_id)
             time.sleep(2)  # 每2秒轮询一次
 
-        print("等待文件超时")
+        print(f"[文件 {file_id}] 等待文件超时")
         return None
 
     def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
