@@ -79,6 +79,8 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
                     print(f"[Domain {domain_id}] with_assigned_domain data1: {len(data1) if data1 else 0} bytes")
 
+                    time.sleep(2)  # 等待一下再获取第二个
+
                     data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
                     print(f"[Domain {domain_id}] without_assigned_domain data2: {len(data2) if data2 else 0} bytes")
 
