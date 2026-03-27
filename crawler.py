@@ -89,7 +89,7 @@ class BugCrawler:
             "fieldId": [1, 2, 4, 5, 6, 7, 264, 9, 11, 12, 14, 15, 17, 18, 19, 24, 263, 27, 34, 268, 67, 68, 48, 39, 40, 41, 42, 43, 44, 45, 46, 47, 474]
         }
 
-    def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[str]:
+    def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[int]:
         """触发导出，返回 file_id"""
         url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
         payload = self.build_export_payload(domain_id, source_type)
@@ -152,9 +152,10 @@ class BugCrawler:
             print(f"查询文件状态失败: {e}")
             return None
 
-    def download_file(self, file_id: str, domain_id: int = 11) -> Optional[bytes]:
+    def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
         """下载 Excel 文件"""
-        url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
+        # file_id 需要加入到 URL 参数中
+        url = f"{self.base_url}/vision-excel/api/query/issue/download_item?id={file_id}&domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
         print(f"[文件 {file_id}] 开始下载... URL: {url}")
 
         try:
@@ -187,7 +188,7 @@ class BugCrawler:
             print(f"[文件 {file_id}] 下载异常: {e}")
             return None
 
-    def wait_and_download(self, file_id: str, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
+    def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
         """轮询等待文件就绪后下载"""
         start_time = time.time()
         print(f"[文件 {file_id}] 开始等待文件生成...")
