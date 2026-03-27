@@ -137,10 +137,14 @@ class BugCrawler:
             )
             response.raise_for_status()
             data = response.json()
+            print(f"[文件 {file_id}] 查询状态响应: {data}")
             if data.get("code") == 0:
                 records = data.get("data", [])
                 if records:
-                    return records[0].get("status")
+                    status = records[0].get("status")
+                    print(f"[文件 {file_id}] 状态: {status}")
+                    return status
+            print(f"[文件 {file_id}] 未找到记录或状态为空")
             return None
         except Exception as e:
             print(f"查询文件状态失败: {e}")
