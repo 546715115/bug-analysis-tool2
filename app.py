@@ -25,6 +25,31 @@ st.set_page_config(
     layout="wide"
 )
 
+# 固定定位侧边栏折叠按钮CSS
+st.markdown("""
+<style>
+    .sidebar-toggle {
+        position: fixed;
+        top: 5px;
+        left: 10px;
+        z-index: 999999;
+        font-size: 18px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 5px 10px;
+    }
+    .sidebar-toggle:hover {
+        background-color: #f0f0f0;
+        border-radius: 5px;
+    }
+    /* 侧边栏展开时样式 */
+    [data-testid="stSidebar"] {
+        z-index: 999998;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 apply_custom_styles()
 
 st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
@@ -170,13 +195,28 @@ if "versions" not in st.session_state:
 if "sidebar_expanded" not in st.session_state:
     st.session_state.sidebar_expanded = False
 
+# 检查URL参数中是否有toggle_sidebar
+query_params = st.query_params
+if query_params.get("toggle") == "1":
+    st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
+    # 清除参数并刷新
+    st.query_params.clear()
+    st.rerun()
 
-# 顶部工具栏
-col_toolbar = st.columns([1, 10])
-with col_toolbar[0]:
-    if st.button("☰", help="展开/折叠侧边栏"):
-        st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
-        st.rerun()
+
+# 固定定位侧边栏切换按钮（HTML实现）
+st.markdown("""
+<div class="sidebar-toggle-btn" style="position:fixed;top:5px;left:10px;z-index:999999;">
+    <button onclick="window.location.href='?toggle=1'" style="
+        font-size:16px;
+        background:#f0f2f6;
+        border:1px solid #d1d5db;
+        border-radius:6px;
+        padding:6px 12px;
+        cursor:pointer;
+    ">☰ 菜单</button>
+</div>
+""", unsafe_allow_html=True)
 
 
 def render_sidebar():
@@ -313,13 +353,20 @@ def main_content():
             # 获取所有数据（经过 CCB 过滤）
             df_all = filter_production_issues(st.session_state.df_raw)
 
-            # 版本过滤
+            # 版本搜索过滤
+            st.markdown("**发现问题版本**")
+            version_search = st.text_input("搜索版本", value="", placeholder="输入版本名称搜索...", key="version_search")
             version_options = ["全部"] + sorted(st.session_state.versions) if st.session_state.versions else ["全部"]
+            if version_search:
+                version_filtered = [v for v in version_options if version_search.lower() in v.lower()]
+            else:
+                version_filtered = version_options
             export_version = st.selectbox(
                 "选择发现问题版本",
-                options=version_options,
+                options=version_filtered if version_filtered else ["无匹配结果"],
                 index=0,
-                help="筛选特定版本的问题单"
+                help="筛选特定版本的问题单",
+                label_visibility="collapsed"
             )
 
             # 先按版本过滤
@@ -328,14 +375,21 @@ def main_content():
             else:
                 df_export = filter_by_version(df_all, export_version)
 
-            # CES 微服务过滤
+            # CES 微服务搜索过滤
+            st.markdown("**CES 微服务**")
             ces_list = df_export["assigned_to_domain"].dropna().unique()
             ces_options = ["全部"] + sorted([str(ms) for ms in ces_list if is_microservice(ms)])
+            ces_search = st.text_input("搜索微服务", value="", placeholder="输入微服务名称搜索...", key="ces_search")
+            if ces_search:
+                ces_filtered = [c for c in ces_options if ces_search.lower() in c.lower()]
+            else:
+                ces_filtered = ces_options
             export_ms = st.selectbox(
                 "选择 CES 微服务",
-                options=ces_options,
+                options=ces_filtered if ces_filtered else ["无匹配结果"],
                 index=0,
-                help="筛选特定微服务的问题单"
+                help="筛选特定微服务的问题单",
+                label_visibility="collapsed"
             )
 
             # 按微服务过滤
@@ -398,11 +452,23 @@ def main_content():
         # 合格标准 - 带tooltip图标
         with col4:
             qualified_html = render_qualified_badge(cloud_di_info["qualified"])
-            st.markdown(f"合格标准: {qualified_html}", unsafe_allow_html=True)
-            with st.popover("❓"):
+            # 小灯泡图标放在"合格标准"前面
+            st.markdown(f"<span style='font-size:0.8em'>💡</span> 合格标准: {qualified_html}", unsafe_allow_html=True)
+            with st.popover("💡"):
                 st.markdown("**合格标准：**")
                 st.markdown("- 云服务 DI < 20 合格")
                 st.markdown("- 微服务 DI < 5 合格")
+                st.markdown("")
+                st.markdown("**SLA 阈值（天）：**")
+                st.markdown("- 致命：7 天")
+                st.markdown("- 严重：14 天")
+                st.markdown("- 一般/提示：30 天")
+                st.markdown("")
+                st.markdown("**DI 权重：**")
+                st.markdown("- 致命：10")
+                st.markdown("- 严重：3")
+                st.markdown("- 一般：1")
+                st.markdown("- 提示：0.1")
 
         st.divider()
 
