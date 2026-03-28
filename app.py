@@ -75,7 +75,7 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     st.sidebar.info(f"正在获取 Domain {domain_id}...")
                     print(f"\n========== 开始获取 Domain {domain_id} ==========")
 
-                    # 获取数据（浏览器只用一次导出，不带 assigned_domain）
+                    # 获取两种条件的数据并合并
                     data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
                     print(f"[Domain {domain_id}] with_assigned_domain data1: {len(data1) if data1 else 0} bytes")
 
@@ -85,7 +85,15 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     else:
                         df1 = pd.DataFrame()
 
-                    df2 = pd.DataFrame()
+                    data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
+                    print(f"[Domain {domain_id}] without_assigned_domain data2: {len(data2) if data2 else 0} bytes")
+
+                    if data2:
+                        df2 = load_excel(data2)
+                        print(f"[Domain {domain_id}] df2 行数: {len(df2)}")
+                    else:
+                        df2 = pd.DataFrame()
+
                     merged = merge_data(df1, df2)
                     print(f"[Domain {domain_id}] 合并后行数: {len(merged)}")
 

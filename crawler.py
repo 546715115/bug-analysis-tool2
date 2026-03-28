@@ -60,13 +60,13 @@ class BugCrawler:
             "data_type": "tree"
         }
 
-        # 浏览器不带 assigned_domain
-        # if source_type == "with_assigned_domain":
-        #     base_conditions["assigned_domain"] = {
-        #         "value": [{"id": domain_id, "type": "Domain"}],
-        #         "operator": "||",
-        #         "convolution": "down"
-        #     }
+        # 根据 source_type 决定是否带 assigned_domain
+        if source_type == "with_assigned_domain":
+            base_conditions["assigned_domain"] = {
+                "value": [{"id": domain_id, "type": "Domain"}],
+                "operator": "||",
+                "convolution": "down"
+            }
 
         return {
             "source_id": domain_id,
