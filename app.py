@@ -110,13 +110,31 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
-        # 生成HTML链接
+        # 直接存储URL原始值
         df_display["问题详情链接"] = df[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="color:#1E3A8A;text-decoration:none;font-weight:600;">查看详情</span></a>'
+            lambda x: f"https://clouddevops.huawei.com/#/bug/{x}"
         )
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
+
+    # 如果有链接列，配置列的渲染方式
+    if link_column and link_column in df.columns and "问题详情链接" in df_display.columns:
+        # 使用JS代码渲染为可点击链接
+        js_code = """function(params) {
+            if (params.value) {
+                var a = document.createElement('a');
+                a.href = params.value;
+                a.target = '_blank';
+                a.innerHTML = '<button style="background-color:#1E3A8A;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">查看详情</button>';
+                return a;
+            }
+            return '';
+        }"""
+        try:
+            gb.configure_column("问题详情链接", cellRenderer=js_code)
+        except Exception:
+            pass
 
     # 分页配置
     if pagination:
