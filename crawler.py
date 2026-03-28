@@ -84,7 +84,7 @@ class BugCrawler:
                 "created_time", "ISSUE_STATUS_SUBMIT", "ISSUE_STATUS_ANALYSIS",
                 "ISSUE_STAGE_PLANNING", "ISSUE_STATUS_FIXING", "ISSUE_STAGE_CODE",
                 "ISSUE_STAGE_TEST", "ISSUE_STAGE_DONE", "ISSUE_STATUS_VERIFYING",
-                "ISSUE_STATUS_RETURNED", "remark"
+                "ISSUE_STATUS_RETURNED", "remark", "dev_person", "delivery_scenario", "from_version"
             ],
             "request_tag": request_tag,
             "fieldId": [1, 2, 4, 5, 6, 7, 264, 9, 11, 12, 14, 15, 17, 18, 19, 24, 263, 27, 34, 268, 67, 68, 48, 39, 40, 41, 42, 43, 44, 45, 46, 47, 474]
