@@ -613,26 +613,27 @@ def main_content():
 
             aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, pagination=False)
 
-            # 问题单明细（按微服务筛选，可折叠）
-            with st.expander("🔍 微 服 务 查 看 问 题 单 详 情"):
-                if "assigned_to_domain" in df_filtered.columns:
-                    microservices = df_filtered["assigned_to_domain"].dropna().unique()
-                    ces_microservices = [ms for ms in microservices if is_microservice(ms)]
-                    selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
-                    if selected_ms:
-                        ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
-                        # 按 DI 规则过滤
-                        ms_issues_filtered = filter_by_di_rules(ms_issues)
-                        ms_display = ms_issues_filtered[["number", "discovered_environment", "title", "severity_level", "status"]].copy()
-                        ms_display.columns = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
-                        # 按严重程度排序：致命 > 严重 > 一般 > 提示
-                        severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
-                        ms_display["_severity_order"] = ms_display["严重程度"].map(severity_order).fillna(99)
-                        ms_display = ms_display.sort_values("_severity_order")
-                        ms_display = ms_display.drop(columns=["_severity_order"])
-                        # 按微服务查看问题单详情可选字段
-                        ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
-                        aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
+            # 微服务查看问题单详情（作为独立区块）
+            st.markdown('<p class="section-header">🔍 微服务查看问题单详情</p>', unsafe_allow_html=True)
+
+            if "assigned_to_domain" in df_filtered.columns:
+                microservices = df_filtered["assigned_to_domain"].dropna().unique()
+                ces_microservices = [ms for ms in microservices if is_microservice(ms)]
+                selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
+                if selected_ms:
+                    ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
+                    # 按 DI 规则过滤
+                    ms_issues_filtered = filter_by_di_rules(ms_issues)
+                    ms_display = ms_issues_filtered[["number", "discovered_environment", "title", "severity_level", "status"]].copy()
+                    ms_display.columns = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
+                    # 按严重程度排序：致命 > 严重 > 一般 > 提示
+                    severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
+                    ms_display["_severity_order"] = ms_display["严重程度"].map(severity_order).fillna(99)
+                    ms_display = ms_display.sort_values("_severity_order")
+                    ms_display = ms_display.drop(columns=["_severity_order"])
+                    # 微服务查看问题单详情可选字段
+                    ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
+                    aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
 
