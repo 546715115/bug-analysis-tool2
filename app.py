@@ -38,6 +38,43 @@ user_id = st.sidebar.text_input("x-titan-userid", value="", help="用户 ID")
 
 st.sidebar.divider()
 
+# Excel 导入功能
+st.sidebar.subheader("📁 Excel 导入")
+uploaded_file1 = st.sidebar.file_uploader("导入 Excel 文件 1", type=["xlsx"], key="file1")
+uploaded_file2 = st.sidebar.file_uploader("导入 Excel 文件 2（可选）", type=["xlsx"], key="file2")
+
+if st.sidebar.button("📂 加载导入的 Excel", type="primary", use_container_width=True):
+    if not uploaded_file1:
+        st.sidebar.error("请至少导入一个 Excel 文件")
+    else:
+        with st.spinner("正在加载 Excel..."):
+            from io import BytesIO
+            try:
+                df1 = load_excel(uploaded_file1.getvalue())
+                print(f"Excel 1 行数: {len(df1)}")
+
+                if uploaded_file2:
+                    df2 = load_excel(uploaded_file2.getvalue())
+                    print(f"Excel 2 行数: {len(df2)}")
+                else:
+                    df2 = pd.DataFrame()
+
+                merged = merge_data(df1, df2)
+                print(f"合并后行数: {len(merged)}")
+
+                if not merged.empty:
+                    merged = normalize_columns(merged)
+                    st.session_state.df_raw = merged
+                    st.session_state.versions = get_version_list(merged)
+                    st.session_state.selected_version = "全部"
+                    st.sidebar.success(f"成功加载 {len(merged)} 条数据")
+                else:
+                    st.sidebar.error("Excel 数据为空")
+            except Exception as e:
+                st.sidebar.error(f"加载失败: {e}")
+
+st.sidebar.divider()
+
 # Domain 配置
 st.sidebar.subheader("Domain 配置")
 domain_input = st.sidebar.text_input(
