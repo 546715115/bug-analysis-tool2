@@ -41,18 +41,6 @@ def apply_custom_styles():
     .css-1d391kg {
         background-color: #f8f9fa;
     }
-    /* 统一样式标题 - 与st.subheader一致 */
-    .section-header {
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-        margin-top: 0.5rem !important;
-        margin-bottom: 0.5rem !important;
-    }
-    /* expander标题样式与subheader一致 */
-    .streamlit-expanderHeader {
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 

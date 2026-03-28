@@ -545,7 +545,7 @@ def main_content():
         st.divider()
 
         # 版本过滤
-        st.markdown('<p class="section-header">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
+        st.subheader("🔍 发 现 问 题 版 本")
 
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
@@ -614,7 +614,7 @@ def main_content():
             aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, pagination=False)
 
             # 微服务查看问题单详情（作为独立区块）
-            st.markdown('<p class="section-header">🔍 微服务查看问题单详情</p>', unsafe_allow_html=True)
+            st.subheader("🔍 微服务查看问题单详情")
 
             if "assigned_to_domain" in df_filtered.columns:
                 microservices = df_filtered["assigned_to_domain"].dropna().unique()
