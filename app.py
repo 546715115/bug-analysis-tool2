@@ -131,11 +131,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     gb = GridOptionsBuilder.from_dataframe(df_display)
 
     # 分页配置
-    gb.configure_pagination(
-        paginationAutoPageSize=False,
-        paginationPageSize=page_size,
-        paginationPageSizeSelector=[10, 20, 50]
-    )
+    try:
+        gb.configure_pagination(
+            paginationAutoPageSize=False,
+            paginationPageSize=page_size
+        )
+    except Exception as e:
+        st.warning(f"configure_pagination failed: {e}")
 
     grid_options = gb.build()
 
@@ -143,6 +145,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     grid_options['pagination'] = True
     grid_options['paginationPageSize'] = page_size
     grid_options['suppressPaginationPanel'] = False
+    # paginationPageSizeSelector 可能不被支持，先注释掉
+    # grid_options['paginationPageSizeSelector'] = [10, 20, 50]
 
     AgGrid(
         df_display,
