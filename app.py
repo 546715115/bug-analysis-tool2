@@ -30,9 +30,16 @@ apply_custom_styles()
 st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
 
 
-def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10):
+def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None):
     """
     使用 AgGrid 渲染可排序、分页、横向滚动的表格
+
+    Args:
+        df: DataFrame 数据
+        columns: 要显示的列
+        height: 表格高度
+        page_size: 默认每页条数
+        link_column: 需要渲染为超链接的列名（如"问题单号"）
     """
     if columns is None:
         columns = list(df.columns)
@@ -46,30 +53,45 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
 
+    df_display = df[display_cols].copy()
+
+    # 如果有链接列，添加超链接
+    if link_column and link_column in df_display.columns:
+        df_display["_link"] = df_display[link_column].apply(
+            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank">{x}</a>'
+        )
+        # 把原列替换成HTML链接
+        df_display[link_column] = df_display["_link"]
+        df_display = df_display.drop(columns=["_link"])
+        # 更新显示列
+        display_cols = [c if c != link_column else link_column for c in display_cols]
+
     # 使用 from_dataframe 方式构建
-    gb = GridOptionsBuilder.from_dataframe(df[display_cols])
+    gb = GridOptionsBuilder.from_dataframe(df_display[display_cols])
 
     # 分页配置
     gb.configure_pagination(
         paginationAutoPageSize=False,
         paginationPageSize=page_size,
-        paginationPageSizeSelector=[10, 20, 50],
-        enabled=True
+        paginationPageSizeSelector=[10, 20, 50]
     )
-
-    # 启用侧边栏筛选面板
-    gb.configure_side_bar(filters_panel=True)
 
     grid_options = gb.build()
 
+    # 确保分页生效
+    grid_options['pagination'] = True
+    grid_options['paginationPageSize'] = page_size
+    grid_options['suppressPaginationPanel'] = False
+
     AgGrid(
-        df[display_cols],
+        df_display[display_cols],
         gridOptions=grid_options,
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
         reload_data=True,
-        enable_enterprise_modules=False
+        enable_enterprise_modules=False,
+        unsafe_allow_html=True  # 允许HTML渲染
     )
 
 
@@ -437,7 +459,7 @@ def main_content():
                         ms_issues_filtered = filter_by_di_rules(ms_issues)
                         ms_display = ms_issues_filtered[["number", "title", "severity_level", "status"]].copy()
                         ms_display.columns = ["问题单号", "标题", "严重程度", "状态"]
-                        aggrid_table(ms_display, height=300)
+                        aggrid_table(ms_display, height=300, link_column="问题单号")
         else:
             st.info("暂无数据")
 
@@ -478,7 +500,7 @@ def main_content():
         # 显示可用的列
         cols_to_show = [c for c in display_cols if c in df_display.columns]
         if cols_to_show:
-            aggrid_table(df_display[cols_to_show], height=400)
+            aggrid_table(df_display[cols_to_show], height=400, link_column="问题单号")
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
