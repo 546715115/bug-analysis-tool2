@@ -76,9 +76,13 @@ def merge_data(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
     if df2.empty:
         return df1.copy()
 
-    df = pd.concat([df1, df2], ignore_index=True)
+    # 先标准化列名（处理中文列名的情况），这样才能正确去重
+    df1_norm = normalize_columns(df1)
+    df2_norm = normalize_columns(df2)
 
-    # 按问题单号去重
+    df = pd.concat([df1_norm, df2_norm], ignore_index=True)
+
+    # 按问题单号去重（normalize后列名是英文number）
     if "number" in df.columns:
         df = df.drop_duplicates(subset=["number"], keep="first")
 
