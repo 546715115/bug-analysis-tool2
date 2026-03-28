@@ -4,23 +4,27 @@ from io import BytesIO
 from typing import List, Optional
 
 FIELD_MAPPING = {
-    "number": "问题单号",
-    "title": "标题",
-    "severity_level": "严重程度",
-    "status": "问题状态",
-    "assigned_to_domain": "责任服务",
-    "from_version": "发现问题版本",
-    "discover_iteration": "发现迭代",
-    "created_time": "创建时间",
-    "delivery_scenario": "交付场景",
-    "valid": "挂起/撤销",
-    "discovered_environment": "发现环境",
-    "labels": "标签",
-    "dev_person": "研发责任人",
-    "testOwners": "测试责任人"
+    "number": ["问题单号", "问题编号"],
+    "title": ["标题", "问题标题"],
+    "severity_level": ["严重程度"],
+    "status": ["问题状态", "状态"],
+    "assigned_to_domain": ["责任服务", "负责域"],
+    "from_version": ["发现问题版本", "版本"],
+    "discover_iteration": ["发现迭代"],
+    "created_time": ["创建时间"],
+    "delivery_scenario": ["交付场景"],
+    "valid": ["挂起/撤销"],
+    "discovered_environment": ["发现环境"],
+    "labels": ["标签"],
+    "dev_person": ["研发责任人"],
+    "testOwners": ["测试责任人"]
 }
 
-CHINESE_TO_ENGLISH = {v: k for k, v in FIELD_MAPPING.items()}
+# 中文到英文的反向映射（处理多种中文列名对应同一英文）
+CHINESE_TO_ENGLISH = {}
+for en, cn_list in FIELD_MAPPING.items():
+    for cn in cn_list:
+        CHINESE_TO_ENGLISH[cn] = en
 
 def load_excel(file_bytes: bytes) -> pd.DataFrame:
     """读取 Excel 文件，返回 DataFrame"""

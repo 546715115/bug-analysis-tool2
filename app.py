@@ -240,29 +240,46 @@ if not st.session_state.df_raw.empty:
     # 问题单明细
     st.subheader("📄 问题单明细")
 
-    # 调试：打印实际列名
+    # 打印实际列名用于调试
     print(f"df_filtered 列名: {list(df_filtered.columns)}")
 
-    # 尝试兼容中英文列名
-    rename_map = {
-        "number": "问题单号", "title": "标题", "severity_level": "严重程度",
-        "status": "问题状态", "assigned_to_domain": "责任服务",
-        "from_version": "发现问题版本", "dev_person": "研发责任人",
-        "testOwners": "测试责任人", "delivery_scenario": "交付场景"
+    # 英文到中文的显示映射
+    en_to_cn_display = {
+        "number": "问题单号",
+        "title": "标题",
+        "severity_level": "严重程度",
+        "status": "问题状态",
+        "assigned_to_domain": "责任服务",
+        "from_version": "发现问题版本",
+        "dev_person": "研发责任人",
+        "testOwners": "测试责任人",
+        "delivery_scenario": "交付场景"
     }
-    display_cols = ["问题单号", "标题", "严重程度", "问题状态", "责任服务", "发现问题版本", "研发责任人", "测试责任人"]
 
-    # 只重命名存在的列
-    existing_rename = {k: v for k, v in rename_map.items() if k in df_filtered.columns}
-    df_display = df_filtered.rename(columns=existing_rename)
+    # 尝试把英文列名转中文，如果原列名是中文直接用
+    display_cols = []
+    col_rename = {}
+    for en, cn in en_to_cn_display.items():
+        if en in df_filtered.columns:
+            col_rename[en] = cn
+            display_cols.append(cn)
+        elif cn in df_filtered.columns:
+            display_cols.append(cn)
 
     # 只选择存在的列
-    existing_cols = [v for v in display_cols if v in df_display.columns]
-    st.dataframe(
-        df_display[existing_cols],
-        hide_index=True,
-        use_container_width=True
-    )
+    available_cols = [c for c in display_cols if c in df_filtered.columns or c in col_rename.values()]
+    df_display = df_filtered.rename(columns=col_rename) if col_rename else df_filtered
+
+    # 显示可用的列
+    cols_to_show = [c for c in display_cols if c in df_display.columns]
+    if cols_to_show:
+        st.dataframe(
+            df_display[cols_to_show],
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.dataframe(df_display, hide_index=True, use_container_width=True)
 
 else:
     st.info("👈 请先在侧边栏填写认证信息并点击「刷新数据」")
