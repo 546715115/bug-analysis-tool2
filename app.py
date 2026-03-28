@@ -157,6 +157,22 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         enableCellHtml=True
     )
 
+    # 添加CSS让表格内容和表头居中
+    st.markdown("""
+    <style>
+    .ag-cell {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    .ag-header-cell {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 
 # 英文到中文的列名映射（用于导出，保持与导入格式一致）
 EN_TO_CN_MAPPING = {
