@@ -25,25 +25,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# 固定定位侧边栏折叠按钮CSS
+# 侧边栏使用Streamlit原生方式，可通过 Streamlit 自带的折叠按钮折叠
 st.markdown("""
 <style>
-    .sidebar-toggle {
-        position: fixed;
-        top: 5px;
-        left: 10px;
-        z-index: 999999;
-        font-size: 18px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 5px 10px;
-    }
-    .sidebar-toggle:hover {
-        background-color: #f0f0f0;
-        border-radius: 5px;
-    }
-    /* 侧边栏展开时样式 */
     [data-testid="stSidebar"] {
         z-index: 999998;
     }
@@ -192,67 +176,8 @@ if "selected_version" not in st.session_state:
     st.session_state.selected_version = "全部"
 if "versions" not in st.session_state:
     st.session_state.versions = []
-if "sidebar_expanded" not in st.session_state:
-    st.session_state.sidebar_expanded = False
-
-# 检查URL参数中是否有toggle_sidebar
-query_params = st.query_params
-if query_params.get("toggle") == "1":
-    st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
-    # 清除参数并刷新
-    st.query_params.clear()
-    st.rerun()
-
-# 侧边栏切换JS
-sidebar_toggle_js = """
-<script>
-function toggleSidebar() {
-    var sidebar = document.querySelector('[data-testid="stSidebar"]');
-    var mainContent = document.querySelector('[data-testid="stMainBlockContainer"]');
-    var btn = document.getElementById('sidebarToggleBtn');
-    if (sidebar) {
-        if (sidebar.style.width === '0px' || sidebar.style.width === '0') {
-            sidebar.style.width = '';
-            sidebar.style.minWidth = '';
-            if (btn) btn.innerHTML = '✕ 收起';
-        } else {
-            sidebar.style.width = '0px';
-            sidebar.style.minWidth = '0px';
-            if (btn) btn.innerHTML = '☰ 菜单';
-        }
-    }
-}
-</script>
-"""
-
-# 固定定位侧边栏切换按钮（HTML实现）
-toggle_text = "✕ 收起" if st.session_state.sidebar_expanded else "☰ 菜单"
-initial_width = "" if st.session_state.sidebar_expanded else "0px"
-
-st.markdown(sidebar_toggle_js, unsafe_allow_html=True)
-st.markdown(f"""
-<div class="sidebar-toggle-btn" style="position:fixed;top:5px;left:10px;z-index:999999;">
-    <button id="sidebarToggleBtn" onclick="toggleSidebar()" style="
-        font-size:16px;
-        background:#f0f2f6;
-        border:1px solid #d1d5db;
-        border-radius:6px;
-        padding:6px 12px;
-        cursor:pointer;
-    ">{toggle_text}</button>
-</div>
-""", unsafe_allow_html=True)
-
-# 初始化侧边栏宽度
-if not st.session_state.sidebar_expanded:
-    st.markdown(f"""
-    <style>
-    [data-testid="stSidebar"] {{
-        width: 0px !important;
-        min-width: 0px !important;
-    }}
-    </style>
-    """, unsafe_allow_html=True)
+# 侧边栏默认展开，移除复杂切换逻辑
+# Streamlit sidebar本身就是可折叠的，用户可以使用侧边栏自身的折叠功能
 
 
 def render_sidebar():
@@ -368,14 +293,6 @@ def render_sidebar():
     if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
         if not st.session_state.df_raw.empty:
             st.session_state.show_export_dialog = True
-        else:
-            st.warning("暂无数据")
-
-    if st.button("◀ 折叠侧边栏"):
-        st.session_state.sidebar_expanded = False
-        st.rerun()
-
-
 def main_content():
     """主页面内容"""
 
@@ -653,20 +570,17 @@ def main_content():
         st.markdown("""
         ### 使用说明
 
-        1. 点击左上角 **☰** 按钮展开侧边栏
-        2. 在侧边栏选择 **API导入** 或 **导入Excel**
-        3. 选择发现问题版本进行过滤
-        4. 查看 CES 微服务 DI 统计
-        5. 点击 **📥 导出版本有效DI-Excel** 下载筛选后的数据
+        1. 在左侧侧边栏选择 **API导入** 或 **导入Excel**
+        2. 选择发现问题版本进行过滤
+        3. 查看 CES 微服务 DI 统计
+        4. 点击 **📥 导出版本有效DI-Excel** 下载筛选后的数据
         """)
 
 
-# 根据侧边栏状态选择布局
-if st.session_state.sidebar_expanded:
-    # 侧边栏展开：渲染侧边栏内容
-    with st.sidebar:
-        render_sidebar()
+# 渲染侧边栏
+with st.sidebar:
+    render_sidebar()
 
-# 主页面内容（始终渲染）
+# 主页面内容
 main_content()
 
