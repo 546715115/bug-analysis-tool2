@@ -57,15 +57,26 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，添加超链接
     if link_column and link_column in df_display.columns:
-        df_display["_link"] = df_display[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank">{x}</a>'
-        )
-        # 把原列替换成HTML链接
-        df_display[link_column] = df_display["_link"]
-        df_display = df_display.drop(columns=["_link"])
+        # 保存原值用于JsCode渲染
+        df_display["_link_value"] = df_display[link_column]
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display[display_cols])
+
+    # 如果有链接列，配置单元格渲染器
+    if link_column and link_column in df_display.columns:
+        from st_aggrid import JsCode
+        link_renderer = JsCode("""
+        function(params) {
+            if (params.value) {
+                var issueNumber = params.value;
+                var url = 'https://clouddevops.huawei.com/#/bug/' + issueNumber;
+                return '<a href="' + url + '" target="_blank" style="color: #1E3A8A; font-weight: 600; text-decoration: none;">' + issueNumber + '</a>';
+            }
+            return params.value;
+        }
+        """)
+        gb.configure_column(link_column, cellRenderer=link_renderer)
 
     # 分页配置
     gb.configure_pagination(
@@ -88,8 +99,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
         reload_data=True,
-        enable_enterprise_modules=False,
-        unsafe_allow_html=True
+        enable_enterprise_modules=False
     )
 
 
