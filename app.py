@@ -73,16 +73,16 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                 if list_key not in st.session_state:
                     st.session_state[list_key] = display_cols.copy()
                 if dict_key not in st.session_state:
-                    st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
+                    # 初始化：默认选中的字段标记为True，其他为False
+                    st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
 
                 with st.form(key=f"form_{session_key}"):
                     st.markdown("**选择展示字段**")
                     st.markdown("---")
-                    # 按从左到右顺序显示所有可选列
+                    # 按从左到右顺序显示所有可选列（所有字段都展示）
                     for col in all_columns:
-                        if col in df.columns:
-                            is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
-                            st.session_state[dict_key][col] = is_checked
+                        is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
+                        st.session_state[dict_key][col] = is_checked
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -91,12 +91,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        # 根据字典更新列表
-                        new_list = [col for col in all_columns if col in df.columns and st.session_state[dict_key].get(col, False)]
+                        # 根据字典更新列表（选中且在df.columns中的字段）
+                        new_list = [col for col in all_columns if st.session_state[dict_key].get(col, False)]
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
-                        st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
+                        # 恢复默认：默认选中的字段
+                        st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
                         st.rerun()
 
         # 使用用户选择的列
