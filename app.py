@@ -202,20 +202,17 @@ if not st.session_state.df_raw.empty:
     ms_di = calculate_microservice_di(df_filtered)
 
     if not ms_di.empty:
-        # 添加可排序的表格
+        # 转换布尔值为文字
+        display_df = ms_di.rename(columns={
+            "assigned_to_domain": "微服务名",
+            "di_sum": "DI 值",
+            "issue_count": "问题单数",
+        })
+        display_df["是否合格"] = display_df["qualified"].apply(lambda x: "✅ 合格" if x else "❌ 不合格")
+        display_df = display_df.drop(columns=["qualified"])
+
         st.dataframe(
-            ms_di.rename(columns={
-                "assigned_to_domain": "微服务名",
-                "di_sum": "DI 值",
-                "issue_count": "问题单数",
-                "qualified": "是否合格"
-            }),
-            column_config={
-                "是否合格": st.column_config.Column(
-                    "是否合格",
-                    formatter=lambda x: "✅ 合格" if x else "❌ 不合格"
-                )
-            },
+            display_df,
             hide_index=True,
             use_container_width=True
         )
