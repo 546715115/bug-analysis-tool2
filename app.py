@@ -62,27 +62,36 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有可选列配置，添加⚙️按钮
     if all_columns:
-        col_left, col_right = st.columns([1, 1])
+        col_left, col_right = st.columns([4, 1])
         with col_right:
-            with st.popover("⚙️", use_container_width=True):
-                st.markdown("**选择展示字段**")
-                st.markdown("---")
-                # 按从左到右顺序显示所有可选列
-                selected = []
-                for col in all_columns:
-                    if col in df.columns:
-                        is_selected = st.checkbox(col, value=(col in st.session_state[session_key]), key=f"{session_key}_{col}")
-                        if is_selected:
-                            selected.append(col)
-                # 确认按钮
-                if st.button("确认", type="primary", use_container_width=True):
-                    if selected:
-                        st.session_state[session_key] = selected
-                    st.rerun()
-                # 重置默认按钮
-                if st.button("恢复默认", use_container_width=True):
-                    st.session_state[session_key] = display_cols.copy()
-                    st.rerun()
+            with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
+                # 使用 form 来管理状态
+                with st.form(key=f"form_{session_key}"):
+                    st.markdown("**选择展示字段**")
+                    st.markdown("---")
+                    # 按从左到右顺序显示所有可选列
+                    current_selections = st.session_state[session_key].copy()
+                    for col in all_columns:
+                        if col in df.columns:
+                            is_selected = st.checkbox(col, value=(col in current_selections), key=f"{session_key}_{col}")
+                            if is_selected:
+                                current_selections.append(col)
+                            elif col in current_selections:
+                                current_selections.remove(col)
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        submitted = st.form_submit_button("确认", type="primary", use_container_width=True)
+                    with col2:
+                        reset = st.form_submit_button("恢复默认", use_container_width=True)
+
+                    if submitted:
+                        if current_selections:
+                            st.session_state[session_key] = current_selections
+                        st.rerun()
+                    if reset:
+                        st.session_state[session_key] = display_cols.copy()
+                        st.rerun()
 
         # 使用用户选择的列
         display_cols = [c for c in st.session_state[session_key] if c in df.columns]
@@ -121,7 +130,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
-        reload_data=True,
+        reload_data=False,
         enable_enterprise_modules=False,
         unsafe_allow_html=True,
         enableCellHtml=True
