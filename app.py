@@ -305,11 +305,16 @@ def main_content():
             df_export = df_export[df_export["_di"] > 0]
             df_export = df_export.drop(columns=["_di"])
 
+            # 按问题单号排序
+            if "number" in df_export.columns:
+                df_export = df_export.sort_values("number", ascending=True)
+
             # 生成文件名
             version_str = export_version if export_version != "全部" else "全部版本"
             ms_str = export_ms if export_ms != "全部" else "全部微服务"
             now = datetime.now()
-            filename = f"发现问题版本{version_str}-CES微服务{ms_str}-{now.strftime('%Y/%m/%d/%H/%M')}.xlsx"
+            # 微服务选项直接替换"CES微服务"占位
+            filename = f"发现问题版本{version_str}-{ms_str}-{now.strftime('%Y/%m/%d/%H/%M')}.xlsx"
 
             st.write(f"符合条件的问题单：**{len(df_export)}** 条")
 
