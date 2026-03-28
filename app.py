@@ -2,12 +2,19 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from io import BytesIO
 
 from config import build_auth_headers
 from crawler import BugCrawler
 from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version
-from di_calculator import calculate_cloud_di, calculate_microservice_di, filter_production_issues, get_issue_detail_url
+from di_calculator import calculate_cloud_di, calculate_microservice_di, filter_production_issues, get_issue_detail_url, is_microservice
 from styles import apply_custom_styles, render_qualified_badge
+
+try:
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    AGGRID_AVAILABLE = True
+except ImportError:
+    AGGRID_AVAILABLE = False
 
 st.set_page_config(
     page_title="DI 统计工具",
@@ -19,6 +26,64 @@ apply_custom_styles()
 
 st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
 
+
+def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: int = 10):
+    """
+    使用 AgGrid 渲染可排序、分页、横向滚动的表格
+
+    Args:
+        df: DataFrame 数据
+        columns: 要显示的列
+        height: 表格高度
+        page_size: 默认每页条数
+    """
+    if not AGGRID_AVAILABLE:
+        st.dataframe(df[columns], hide_index=True, use_container_width=True, height=height)
+        return
+
+    # 过滤存在的列
+    display_cols = [c for c in columns if c in df.columns]
+    if not display_cols:
+        st.dataframe(df, hide_index=True, use_container_width=True, height=height)
+        return
+
+    gb = GridOptionsBuilder.from_dataframe(df[display_cols])
+    gb.configure_default_column(sortable=True, resizable=True, filterable=True)
+    gb.configurePagination(
+        paginationAutoPageSize=False,
+        paginationPageSize=page_size,
+        paginationPageSizeSelector=[10, 20, 50]
+    )
+    gb.configure_side_bar(filters_panel=True)
+    gb.configure_column(
+        field="number",
+        headerName="问题单号",
+        cellRenderer="agTextRenderer",
+        url=True,
+        width=120
+    )
+    grid_options = gb.build()
+
+    grid_response = AgGrid(
+        df[display_cols],
+        gridOptions=grid_options,
+        update_mode=GridUpdateMode.MODEL_CHANGED,
+        height=height,
+        fit_columns_on_grid_load=True,
+        allow_unsafe_jscode=True
+    )
+    return grid_response
+
+
+def export_to_excel(df: pd.DataFrame, filename: str):
+    """导出 DataFrame 为 Excel 文件"""
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='问题单明细')
+    output.seek(0)
+    return output.getvalue()
+
+
 # 初始化 session state
 if "df_raw" not in st.session_state:
     st.session_state.df_raw = pd.DataFrame()
@@ -28,6 +93,7 @@ if "selected_version" not in st.session_state:
     st.session_state.selected_version = "全部"
 if "versions" not in st.session_state:
     st.session_state.versions = []
+
 
 # 侧边栏
 st.sidebar.title("DI 统计工具")
@@ -136,18 +202,65 @@ with st.sidebar.expander("📁 导入 Excel", expanded=True):
                 except Exception as e:
                     st.error(f"加载失败: {e}")
 
-# 导出功能
-st.sidebar.subheader("导出功能")
 
-if st.sidebar.button("📥 导出原始数据", use_container_width=True):
+# 导出功能 - 改用抽屉式弹窗
+@st.dialog("导出问题单数据")
+def export_dialog():
+    """导出数据弹窗"""
+    st.write("### 导出条件筛选")
+
+    # 获取所有数据（经过 CCB 过滤）
+    df_all = filter_production_issues(st.session_state.df_raw)
+
+    # 版本过滤
+    version_options = ["全部"] + sorted(st.session_state.versions) if st.session_state.versions else ["全部"]
+    export_version = st.selectbox(
+        "选择发现问题版本",
+        options=version_options,
+        index=0,
+        help="筛选特定版本的问题单"
+    )
+
+    # 先按版本过滤
+    if export_version == "全部":
+        df_export = df_all.copy()
+    else:
+        df_export = filter_by_version(df_all, export_version)
+
+    # CES 微服务过滤
+    ces_list = df_export["assigned_to_domain"].dropna().unique()
+    ces_options = ["全部"] + sorted([str(ms) for ms in ces_list if is_microservice(ms)])
+    export_ms = st.selectbox(
+        "选择 CES 微服务",
+        options=ces_options,
+        index=0,
+        help="筛选特定微服务的问题单"
+    )
+
+    # 按微服务过滤
+    if export_ms != "全部":
+        df_export = df_export[df_export["assigned_to_domain"] == export_ms]
+
+    st.write(f"符合条件的问题单：**{len(df_export)}** 条")
+
+    if st.button("📥 下载 Excel", type="primary"):
+        if not df_export.empty:
+            # 导出时不需要中文列名，直接用原始英文列名保持和导入格式一致
+            excel_data = export_to_excel(df_export, "bug_export.xlsx")
+            st.download_button(
+                label="点击下载",
+                data=excel_data,
+                file_name=f"bug_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            st.warning("没有符合条件的数据")
+
+
+# 导出按钮
+if st.sidebar.button("📥 导出 Excel", use_container_width=True):
     if not st.session_state.df_raw.empty:
-        csv = st.session_state.df_raw.to_csv(index=False)
-        st.sidebar.download_button(
-            label="下载 CSV",
-            data=csv,
-            file_name=f"bug_raw_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+        export_dialog()
     else:
         st.sidebar.warning("暂无数据")
 
@@ -211,27 +324,19 @@ if not st.session_state.df_raw.empty:
         display_df["是否合格"] = display_df["qualified"].apply(lambda x: "✅ 合格" if x else "❌ 不合格")
         display_df = display_df.drop(columns=["qualified"])
 
-        # 可排序表格
-        st.dataframe(
-            display_df,
-            column_config={
-                "是否合格": st.column_config.Column("是否合格")
-            },
-            hide_index=True,
-            use_container_width=True,
-            height=300
-        )
+        aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
 
         # 问题单明细（按微服务筛选，可折叠）
         with st.expander("🔍 按微服务查看问题单详情"):
             if "assigned_to_domain" in df_filtered.columns:
                 microservices = df_filtered["assigned_to_domain"].dropna().unique()
-                selected_ms = st.selectbox("选择微服务", options=list(microservices))
+                ces_microservices = [ms for ms in microservices if is_microservice(ms)]
+                selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
                 if selected_ms:
                     ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
-                    st.dataframe(ms_issues[["number", "title", "severity_level", "status"]].rename(columns={
-                        "number": "问题单号", "title": "标题", "severity_level": "严重程度", "status": "状态"
-                    }), hide_index=True, use_container_width=True)
+                    ms_display = ms_issues[["number", "title", "severity_level", "status"]].copy()
+                    ms_display.columns = ["问题单号", "标题", "严重程度", "状态"]
+                    aggrid_table(ms_display, ["问题单号", "标题", "严重程度", "状态"], height=300)
     else:
         st.info("暂无数据")
 
@@ -240,15 +345,13 @@ if not st.session_state.df_raw.empty:
     # 问题单明细
     st.subheader("📄 问题单明细")
 
-    # 打印实际列名用于调试
-    print(f"df_filtered 列名: {list(df_filtered.columns)}")
-
     # 英文到中文的显示映射
     en_to_cn_display = {
         "number": "问题单号",
         "title": "标题",
         "severity_level": "严重程度",
         "status": "问题状态",
+        "stage": "问题阶段",
         "assigned_to_domain": "责任服务",
         "from_version": "发现问题版本",
         "dev_person": "研发责任人",
@@ -257,8 +360,8 @@ if not st.session_state.df_raw.empty:
     }
 
     # 尝试把英文列名转中文，如果原列名是中文直接用
-    display_cols = []
     col_rename = {}
+    display_cols = []
     for en, cn in en_to_cn_display.items():
         if en in df_filtered.columns:
             col_rename[en] = cn
@@ -266,18 +369,12 @@ if not st.session_state.df_raw.empty:
         elif cn in df_filtered.columns:
             display_cols.append(cn)
 
-    # 只选择存在的列
-    available_cols = [c for c in display_cols if c in df_filtered.columns or c in col_rename.values()]
     df_display = df_filtered.rename(columns=col_rename) if col_rename else df_filtered
 
     # 显示可用的列
     cols_to_show = [c for c in display_cols if c in df_display.columns]
     if cols_to_show:
-        st.dataframe(
-            df_display[cols_to_show],
-            hide_index=True,
-            use_container_width=True
-        )
+        aggrid_table(df_display, cols_to_show, height=400)
     else:
         st.dataframe(df_display, hide_index=True, use_container_width=True)
 
@@ -291,5 +388,5 @@ else:
     2. 点击「刷新数据」按钮获取问题单数据
     3. 选择发现问题版本进行过滤
     4. 查看 CES 微服务 DI 统计
-    5. 点击「导出原始数据」下载 CSV 文件
+    5. 点击「导出 Excel」下载筛选后的数据
     """)
