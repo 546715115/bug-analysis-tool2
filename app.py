@@ -203,20 +203,56 @@ if query_params.get("toggle") == "1":
     st.query_params.clear()
     st.rerun()
 
+# 侧边栏切换JS
+sidebar_toggle_js = """
+<script>
+function toggleSidebar() {
+    var sidebar = document.querySelector('[data-testid="stSidebar"]');
+    var mainContent = document.querySelector('[data-testid="stMainBlockContainer"]');
+    var btn = document.getElementById('sidebarToggleBtn');
+    if (sidebar) {
+        if (sidebar.style.width === '0px' || sidebar.style.width === '0') {
+            sidebar.style.width = '';
+            sidebar.style.minWidth = '';
+            if (btn) btn.innerHTML = '✕ 收起';
+        } else {
+            sidebar.style.width = '0px';
+            sidebar.style.minWidth = '0px';
+            if (btn) btn.innerHTML = '☰ 菜单';
+        }
+    }
+}
+</script>
+"""
 
 # 固定定位侧边栏切换按钮（HTML实现）
-st.markdown("""
+toggle_text = "✕ 收起" if st.session_state.sidebar_expanded else "☰ 菜单"
+initial_width = "" if st.session_state.sidebar_expanded else "0px"
+
+st.markdown(sidebar_toggle_js, unsafe_allow_html=True)
+st.markdown(f"""
 <div class="sidebar-toggle-btn" style="position:fixed;top:5px;left:10px;z-index:999999;">
-    <button onclick="window.location.href='?toggle=1'" style="
+    <button id="sidebarToggleBtn" onclick="toggleSidebar()" style="
         font-size:16px;
         background:#f0f2f6;
         border:1px solid #d1d5db;
         border-radius:6px;
         padding:6px 12px;
         cursor:pointer;
-    ">☰ 菜单</button>
+    ">{toggle_text}</button>
 </div>
 """, unsafe_allow_html=True)
+
+# 初始化侧边栏宽度
+if not st.session_state.sidebar_expanded:
+    st.markdown(f"""
+    <style>
+    [data-testid="stSidebar"] {{
+        width: 0px !important;
+        min-width: 0px !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def render_sidebar():
