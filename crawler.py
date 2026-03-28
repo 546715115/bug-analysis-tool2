@@ -60,12 +60,13 @@ class BugCrawler:
             "data_type": "tree"
         }
 
-        if source_type == "with_assigned_domain":
-            base_conditions["assigned_domain"] = {
-                "value": [{"id": domain_id, "type": "Domain"}],
-                "operator": "||",
-                "convolution": "down"
-            }
+        # 浏览器不带 assigned_domain
+        # if source_type == "with_assigned_domain":
+        #     base_conditions["assigned_domain"] = {
+        #         "value": [{"id": domain_id, "type": "Domain"}],
+        #         "operator": "||",
+        #         "convolution": "down"
+        #     }
 
         return {
             "source_id": domain_id,
@@ -91,6 +92,15 @@ class BugCrawler:
 
     def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[int]:
         """触发导出，返回 file_id"""
+        # 第一次调用时先获取字段配置
+        if not hasattr(self, '_export_initialized'):
+            config_url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
+            try:
+                self.session.get(config_url, headers=self._get_headers(), timeout=30, verify=False)
+            except Exception:
+                pass
+            self._export_initialized = True
+
         url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
         payload = self.build_export_payload(domain_id, source_type)
 
