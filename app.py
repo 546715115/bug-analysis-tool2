@@ -193,9 +193,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     }
     </style>
     """, unsafe_allow_html=True)
-        unsafe_allow_html=True,
-        enableCellHtml=True
-    )
 
 
 # 英文到中文的列名映射（用于导出，保持与导入格式一致）
