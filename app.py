@@ -22,24 +22,12 @@ except ImportError:
 st.set_page_config(
     page_title="CES DI 统计工具",
     page_icon="📊",
-    layout="wide",
-    menu_items=None
+    layout="wide"
 )
 
 apply_custom_styles()
 
-# 顶部导航栏
-st.markdown("""
-<div class="top-nav">
-    <div class="nav-logo">
-        <div class="nav-logo-icon">📊</div>
-        <span class="nav-title">CES DI 统计工具</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# 主内容容器
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
+st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
 
 
 def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None):
@@ -86,29 +74,21 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         paginationPageSizeSelector=[10, 20, 50]
     )
 
-    # 自动适应列宽
-    gb.configure_default_column(
-        autoSizeColumns=True,
-        resizable=True
-    )
-
     grid_options = gb.build()
 
     # 确保分页生效
     grid_options['pagination'] = True
     grid_options['paginationPageSize'] = page_size
     grid_options['suppressPaginationPanel'] = False
-    grid_options['autoSizeColumns'] = True
 
     AgGrid(
         df_display[display_cols],
         gridOptions=grid_options,
         height=height,
-        fit_columns_on_grid_load=True,
+        fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
         reload_data=True,
         enable_enterprise_modules=False,
-        theme='alpine',  # 使用alpine主题
         unsafe_allow_html=True
     )
 
@@ -397,7 +377,7 @@ def main_content():
         df_all = filter_production_issues(st.session_state.df_raw)
 
         # 云服务概览
-        st.markdown('<div class="section-title">☁️ 云服务 DI 概览</div>', unsafe_allow_html=True)
+        st.subheader("☁️ 云服务 DI 概览")
 
         cloud_di_info = calculate_cloud_di(df_all)
         ms_di_all = calculate_microservice_di_with_count(df_all)
@@ -405,14 +385,10 @@ def main_content():
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
         overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
 
-        # 指标卡片行
         col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.markdown('<div class="metric-card"><div class="metric-label">云服务</div><div class="metric-value">Cloud Eye</div></div>', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">总 DI 值</div><div class="metric-value">{cloud_di_info["di"]}</div></div>', unsafe_allow_html=True)
-        with col3:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">总问题单</div><div class="metric-value">{cloud_di_info["issue_count"]}</div></div>', unsafe_allow_html=True)
+        col1.metric("云服务", "Cloud Eye")
+        col2.metric("总 DI 值", cloud_di_info["di"])
+        col3.metric("总问题单", cloud_di_info["issue_count"])
 
         # 合格标准 - 点击文字展开tips
         with col4:
@@ -465,7 +441,7 @@ def main_content():
         st.divider()
 
         # 版本过滤
-        st.markdown('<div class="section-title">🔍 发 现 问 题 版 本 过 滤</div>', unsafe_allow_html=True)
+        st.subheader("🔍 发 现 问 题 版 本 过 滤")
 
         # 导出按钮
         if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
@@ -500,7 +476,7 @@ def main_content():
         st.divider()
 
         # CES 微服务 DI 明细
-        st.markdown('<div class="section-title">📋 CES 微服务 DI 明细</div>', unsafe_allow_html=True)
+        st.subheader("📋 CES 微服务 DI 明细")
 
         # 按版本过滤
         df_filtered = filter_by_version(df_all, st.session_state.selected_version)
@@ -559,7 +535,7 @@ def main_content():
         st.divider()
 
         # 问题单明细
-        st.markdown('<div class="section-title">📄 问题单明细</div>', unsafe_allow_html=True)
+        st.subheader("📄 问题单明细")
 
         # 按 DI 规则过滤
         df_di_filtered = filter_by_di_rules(df_filtered)
@@ -624,7 +600,4 @@ with st.sidebar:
 
 # 主页面内容
 main_content()
-
-# 关闭主内容容器
-st.markdown('</div>', unsafe_allow_html=True)
 
