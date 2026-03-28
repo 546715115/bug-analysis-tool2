@@ -453,11 +453,9 @@ def main_content():
         col2.metric("总 DI 值", cloud_di_info["di"])
         col3.metric("总问题单", cloud_di_info["issue_count"])
 
-        # 合格标准 - 带tooltip图标
+        # 合格标准 - 带tooltip图标（仅显示图标，点击展开完整内容）
         with col4:
-            qualified_html = render_qualified_badge(overall_qualified)
-            # 小灯泡图标放在"合格标准"前面
-            st.markdown(f"<span style='font-size:0.8em'>💡</span> 合格标准: {qualified_html}", unsafe_allow_html=True)
+            st.markdown("<span style='font-size:0.8em'>💡</span> 合格标准", unsafe_allow_html=True)
             with st.popover("💡"):
                 st.markdown("**合格标准：**")
                 st.markdown("云服务 DI < 20 **且** 微服务 DI < 5，同时满足方为合格")
