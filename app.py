@@ -92,10 +92,13 @@ def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: 
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
-    """导出 DataFrame 为 Excel 文件"""
+    """导出 DataFrame 为 Excel 文件，带表头筛选功能"""
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='问题单明细')
+        # 添加表头筛选功能
+        worksheet = writer.sheets['问题单明细']
+        worksheet.auto_filter.ref = worksheet.dimensions
     output.seek(0)
     return output.getvalue()
 
