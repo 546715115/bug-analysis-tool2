@@ -400,7 +400,7 @@ def main_content():
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("云服务", "Cloud Eye")
-        col2.metric("总 DI 值", cloud_di_info["di"])
+        col2.metric("总有效DI值", cloud_di_info["di"])
         col3.metric("总问题单", cloud_di_info["issue_count"])
 
         # 合格标准和导出按钮都在第四列
