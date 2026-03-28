@@ -103,17 +103,14 @@ class BugCrawler:
                 verify=False
             )
 
-            print(f"[Domain {domain_id}] export 状态: {response.status_code}")
-            data = response.json()
-            print(f"[Domain {domain_id}] export 响应: {data}")
+            if response.status_code != 200:
+                return None
 
+            data = response.json()
             if data.get("code") == 200:
-                file_id = data.get("data", {}).get("id")
-                print(f"[Domain {domain_id}] file_id: {file_id}")
-                return file_id
+                return data.get("data", {}).get("id")
             return None
-        except Exception as e:
-            print(f"[Domain {domain_id}] export 异常: {e}")
+        except Exception:
             return None
 
     def query_file_status(self, file_id: int) -> Optional[str]:
@@ -154,7 +151,8 @@ class BugCrawler:
                 verify=False
             )
             print(f"[文件 {file_id}] 状态码: {response.status_code}, 大小: {len(response.content)}")
-            if response.status_code == 200 and not response.content.startswith(b'<'):
+            # 200 和 201 都是成功响应
+            if response.status_code in (200, 201) and not response.content.startswith(b'<'):
                 return response.content
             print(f"[文件 {file_id}] 响应前100字节: {response.content[:100]}")
             return None
