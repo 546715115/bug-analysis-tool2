@@ -39,7 +39,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         columns: 要显示的列
         height: 表格高度
         page_size: 默认每页条数
-        link_column: 需要渲染为超链接的列名（如"问题单号"）
+        link_column: 问题单号列名，用于生成"查看详情"按钮
     """
     if columns is None:
         columns = list(df.columns)
@@ -55,10 +55,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     df_display = df[display_cols].copy()
 
-    # 如果有链接列，直接将列值替换为HTML超链接
-    if link_column and link_column in df_display.columns:
-        df_display[link_column] = df_display[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank" style="color: #1E3A8A; font-weight: 600; text-decoration: none;">{x}</a>'
+    # 如果有链接列，在最后添加"查看详情"按钮列
+    if link_column and link_column in df.columns:
+        df_display["查看详情"] = df[link_column].apply(
+            lambda x: f'<button onclick="window.open(\'https://clouddevops.huawei.com/#/bug/{x}\', \'_blank\')" style="background-color: #1E3A8A; color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px;">查看详情</button>'
         )
 
     # 使用 from_dataframe 方式构建
@@ -87,8 +87,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         reload_data=True,
         enable_enterprise_modules=False,
         unsafe_allow_html=True,
-        enableCellHtml=True,
-        suppressCellFocus=True
+        enableCellHtml=True
     )
 
 
