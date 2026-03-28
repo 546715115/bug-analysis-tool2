@@ -30,10 +30,13 @@ apply_custom_styles()
 st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
 
 
-def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: int = 10):
+def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10):
     """
     使用 AgGrid 渲染可排序、分页、横向滚动的表格
     """
+    if columns is None:
+        columns = list(df.columns)
+
     if not AGGRID_AVAILABLE:
         st.dataframe(df[columns] if columns else df, hide_index=True, use_container_width=True, height=height)
         return
@@ -43,19 +46,19 @@ def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: 
         st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
 
-    gb = GridOptionsBuilder()
-    gb.configure_columns(display_cols, sortable=True, resizable=True, filterable=True)
-    gb.configure_default_column(sortable=True, resizable=True)
+    # 使用 from_dataframe 方式构建
+    gb = GridOptionsBuilder.from_dataframe(df[display_cols])
 
     # 分页配置
     gb.configure_pagination(
         paginationAutoPageSize=False,
         paginationPageSize=page_size,
-        paginationPageSizeSelector=[10, 20, 50]
+        paginationPageSizeSelector=[10, 20, 50],
+        enabled=True
     )
 
-    # 横向滚动
-    gb.configure_grid_options(domLayout='normal', width='auto', suppressColumnVirtualisation=False)
+    # 启用侧边栏筛选面板
+    gb.configure_side_bar(filters_panel=True)
 
     grid_options = gb.build()
 
@@ -65,8 +68,26 @@ def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: 
         height=height,
         fit_columns_on_grid_load=False,
         allow_unsafe_jscode=True,
-        reload_data=False
+        reload_data=True,
+        enable_enterprise_modules=False
     )
+
+
+def filter_by_di_rules(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    按 DI 统计规则过滤问题单
+    返回 DI > 0 的问题单
+    """
+    if df.empty:
+        return df
+
+    current_time = datetime.now()
+    from di_calculator import calculate_di_for_issue
+    df_result = df.copy()
+    df_result["_di"] = df_result.apply(lambda row: calculate_di_for_issue(row, current_time), axis=1)
+    df_result = df_result[df_result["_di"] > 0]
+    df_result = df_result.drop(columns=["_di"])
+    return df_result
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
@@ -380,9 +401,11 @@ def main_content():
                     selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
                     if selected_ms:
                         ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
-                        ms_display = ms_issues[["number", "title", "severity_level", "status"]].copy()
+                        # 按 DI 规则过滤
+                        ms_issues_filtered = filter_by_di_rules(ms_issues)
+                        ms_display = ms_issues_filtered[["number", "title", "severity_level", "status"]].copy()
                         ms_display.columns = ["问题单号", "标题", "严重程度", "状态"]
-                        aggrid_table(ms_display, ["问题单号", "标题", "严重程度", "状态"], height=300)
+                        aggrid_table(ms_display, height=300)
         else:
             st.info("暂无数据")
 
@@ -390,6 +413,9 @@ def main_content():
 
         # 问题单明细
         st.subheader("📄 问题单明细")
+
+        # 按 DI 规则过滤
+        df_di_filtered = filter_by_di_rules(df_filtered)
 
         # 英文到中文的显示映射
         en_to_cn_display = {
@@ -409,18 +435,18 @@ def main_content():
         col_rename = {}
         display_cols = []
         for en, cn in en_to_cn_display.items():
-            if en in df_filtered.columns:
+            if en in df_di_filtered.columns:
                 col_rename[en] = cn
                 display_cols.append(cn)
-            elif cn in df_filtered.columns:
+            elif cn in df_di_filtered.columns:
                 display_cols.append(cn)
 
-        df_display = df_filtered.rename(columns=col_rename) if col_rename else df_filtered
+        df_display = df_di_filtered.rename(columns=col_rename) if col_rename else df_di_filtered
 
         # 显示可用的列
         cols_to_show = [c for c in display_cols if c in df_display.columns]
         if cols_to_show:
-            aggrid_table(df_display, cols_to_show, height=400)
+            aggrid_table(df_display[cols_to_show], height=400)
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
