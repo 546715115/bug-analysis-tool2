@@ -112,25 +112,67 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
 
     # 非生产环境
     if env == "非生产环境":
-        # 待提交、已关闭 不统计
+        # 待提交/空 → 不统计
         if status == "待提交" and stage == "":
             return False, "非生产-待提交"
+        # 已关闭/空 → 不统计
         if status == "已关闭" and stage == "":
             return False, "非生产-已关闭"
-        # 其他（非生产）都统计
-        return True, "非生产-统计"
+        # 待确认/空 → 统计
+        if status == "待确认" and stage == "":
+            return True, "非生产-待确认"
+        # 定位中/空 → 统计
+        if status == "定位中" and stage == "":
+            return True, "非生产-定位中"
+        # 待修复/空 → 统计
+        if status == "待修复" and stage == "":
+            return True, "非生产-待修复"
+        # 修复/修复中 → 统计
+        if status == "修复" and stage == "修复中":
+            return True, "非生产-修复中"
+        # 修复/修复测试 → 统计
+        if status == "修复" and stage == "修复测试":
+            return True, "非生产-修复测试"
+        # 修复/修复完成 → 统计
+        if status == "修复" and stage == "修复完成":
+            return True, "非生产-修复完成"
+        # 待验收/空 → 统计
+        if status == "待验收" and stage == "":
+            return True, "非生产-待验收"
+        # 其他情况 → 不统计
+        return False, "非生产-其他"
 
     # 生产环境
     if env == "生产环境":
-        # 待验收、已关闭、修复+修复完成 不统计
+        # 待提交/空 → 不统计
+        if status == "待提交" and stage == "":
+            return False, "生产-待提交"
+        # 待验收/空 → 不统计
         if status == "待验收" and stage == "":
             return False, "生产-待验收"
+        # 已关闭/空 → 不统计
         if status == "已关闭" and stage == "":
             return False, "生产-已关闭"
+        # 修复/修复完成 → 不统计
         if status == "修复" and stage == "修复完成":
             return False, "生产-修复完成"
-        # 待确认、待修复、修复+修复中、修复+修复测试 统计
-        return True, "生产-统计"
+        # 待确认/空 → 统计
+        if status == "待确认" and stage == "":
+            return True, "生产-待确认"
+        # 定位中/空 → 统计
+        if status == "定位中" and stage == "":
+            return True, "生产-定位中"
+        # 待修复/空 → 统计
+        if status == "待修复" and stage == "":
+            return True, "生产-待修复"
+        # 修复/修复中 → 统计
+        if status == "修复" and stage == "修复中":
+            return True, "生产-修复中"
+        # 修复/修复测试 → 统计
+        if status == "修复" and stage == "修复测试":
+            return True, "生产-修复测试"
+        # 其他情况 → 不统计
+        return False, "生产-其他"
 
     # 环境为空或其他未知情况，默认统计
     return True, "环境未知-统计"
