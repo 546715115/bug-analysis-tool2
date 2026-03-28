@@ -547,6 +547,9 @@ def main_content():
             display_df["是否合格"] = display_df["qualified"].apply(lambda x: "✅ 合格" if x else "❌ 不合格")
             display_df = display_df.drop(columns=["qualified"])
 
+            # 过滤空行（只保留有微服务名的行）
+            display_df = display_df[display_df["微服务名"].notna() & (display_df["微服务名"] != "")]
+
             # 添加总计行
             total_di = display_df["DI 值"].sum()
             total_issues = display_df["问题单数"].sum()
