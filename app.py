@@ -114,33 +114,27 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         df_display["问题详情链接"] = df[link_column].apply(
             lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="color:#1E3A8A;text-decoration:none;font-weight:600;">查看详情</span></a>'
         )
-        # DEBUG: 显示问题详情链接列的前几行值
-        st.write("[DEBUG] 问题详情链接列的前3行值:")
-        st.write(df_display["问题详情链接"].head(3).tolist())
-        st.write(f"[DEBUG] df_display.columns = {list(df_display.columns)}")
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
-
-    # 为HTML列启用HTML渲染
-    if link_column and link_column in df.columns:
-        # 找到"问题详情链接"列的index
-        if "问题详情链接" in df_display.columns:
-            try:
-                st.write("[DEBUG] 配置问题详情链接列的cellRenderer")
-                gb.configure_column("问题详情链接", cellRenderer='agTextCellRenderer')
-            except Exception as e:
-                st.warning(f"[DEBUG] configure_column失败: {e}")
 
     # 分页配置
     if pagination:
         try:
             gb.configure_pagination(
-                paginationAutoPageSize=False,
-                paginationPageSize=page_size
+                paginationAutoPageSize=True,  # 自动设置分页大小以适应数据
+                paginationPageSize=page_size,
+                paginationPageSizeSelector=[10, 20, 50, 100]
             )
         except Exception:
-            pass
+            # 如果不支持paginationPageSizeSelector，回退
+            try:
+                gb.configure_pagination(
+                    paginationAutoPageSize=True,
+                    paginationPageSize=page_size
+                )
+            except Exception:
+                pass
 
     grid_options = gb.build()
 
