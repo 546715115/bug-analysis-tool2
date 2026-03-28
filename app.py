@@ -105,13 +105,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         # 构建 column_config 字典
         column_configs = {}
         for col in display_cols:
-            column_configs[col] = column_config.TextColumn(col, width="medium")
+            column_configs[col] = column_config.TextColumn(col)
 
         # 添加链接列，使用 LinkColumn
         df_display["问题详情链接"] = df[link_column].apply(
             lambda x: f"https://clouddevops.huawei.com/#/bug/{x}"
         )
-        column_configs["问题详情链接"] = column_config.LinkColumn("问题详情链接", display_text="查看详情", width="small")
+        column_configs["问题详情链接"] = column_config.LinkColumn("问题详情链接", display_text="查看详情")
 
         # 按选择的列排序 df_display
         final_cols = [c for c in display_cols if c in df_display.columns and c != "问题详情链接"]
