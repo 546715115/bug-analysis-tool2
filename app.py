@@ -211,11 +211,27 @@ if not st.session_state.df_raw.empty:
         display_df["是否合格"] = display_df["qualified"].apply(lambda x: "✅ 合格" if x else "❌ 不合格")
         display_df = display_df.drop(columns=["qualified"])
 
+        # 可排序表格
         st.dataframe(
             display_df,
+            column_config={
+                "是否合格": st.column_config.Column("是否合格")
+            },
             hide_index=True,
-            use_container_width=True
+            use_container_width=True,
+            height=300
         )
+
+        # 问题单明细（按微服务筛选，可折叠）
+        with st.expander("🔍 按微服务查看问题单详情"):
+            if "assigned_to_domain" in df_filtered.columns:
+                microservices = df_filtered["assigned_to_domain"].dropna().unique()
+                selected_ms = st.selectbox("选择微服务", options=list(microservices))
+                if selected_ms:
+                    ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
+                    st.dataframe(ms_issues[["number", "title", "severity_level", "status"]].rename(columns={
+                        "number": "问题单号", "title": "标题", "severity_level": "严重程度", "status": "状态"
+                    }), hide_index=True, use_container_width=True)
     else:
         st.info("暂无数据")
 
@@ -224,25 +240,29 @@ if not st.session_state.df_raw.empty:
     # 问题单明细
     st.subheader("📄 问题单明细")
 
-    # 展示当前过滤条件下的所有问题单
+    # 调试：打印实际列名
+    print(f"df_filtered 列名: {list(df_filtered.columns)}")
+
+    # 尝试兼容中英文列名
+    rename_map = {
+        "number": "问题单号", "title": "标题", "severity_level": "严重程度",
+        "status": "问题状态", "assigned_to_domain": "责任服务",
+        "from_version": "发现问题版本", "dev_person": "研发责任人",
+        "testOwners": "测试责任人", "delivery_scenario": "交付场景"
+    }
+    display_cols = ["问题单号", "标题", "严重程度", "问题状态", "责任服务", "发现问题版本", "研发责任人", "测试责任人"]
+
+    # 只重命名存在的列
+    existing_rename = {k: v for k, v in rename_map.items() if k in df_filtered.columns}
+    df_display = df_filtered.rename(columns=existing_rename)
+
+    # 只选择存在的列
+    existing_cols = [v for v in display_cols if v in df_display.columns]
     st.dataframe(
-        df_filtered.rename(columns={
-            "number": "问题单号",
-            "title": "标题",
-            "severity_level": "严重程度",
-            "status": "问题状态",
-            "assigned_to_domain": "责任服务",
-            "from_version": "发现问题版本",
-            "dev_person": "研发责任人",
-            "testOwners": "测试责任人",
-            "delivery_scenario": "交付场景"
-        })[[
-            "问题单号", "标题", "严重程度", "问题状态",
-            "责任服务", "发现问题版本", "研发责任人", "测试责任人"
-        ]],
+        df_display[existing_cols],
         hide_index=True,
         use_container_width=True
-        )
+    )
 
 else:
     st.info("👈 请先在侧边栏填写认证信息并点击「刷新数据」")

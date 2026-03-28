@@ -91,7 +91,7 @@ def filter_by_version(df: pd.DataFrame, version: Optional[str] = None) -> pd.Dat
     """
     按发现版本过滤
     - version=None 或 "全部": 返回所有数据
-    - version 有值: 返回 from_version=该版本 或 from_version为空 的数据
+    - version 有值: 返回 from_version <= 该版本 或 from_version为空 的数据
     """
     if df.empty:
         return df
@@ -99,9 +99,21 @@ def filter_by_version(df: pd.DataFrame, version: Optional[str] = None) -> pd.Dat
     if version is None or version == "全部":
         return df
 
-    # 返回指定版本 + 空版本的数据
+    # 获取所有版本并排序
+    versions = df["from_version"].dropna()
+    versions = versions[versions != ""]
+    unique_versions = sorted(versions.unique().tolist(), reverse=True)
+
+    if version not in unique_versions:
+        return df
+
+    # 找到选中版本的位置，返回该位置及之后的版本（更小的版本）
+    version_idx = unique_versions.index(version)
+    smaller_versions = unique_versions[version_idx:]
+
+    # 返回更小版本 + 空版本的数据
     return df[
-        (df["from_version"] == version) |
+        (df["from_version"].isin(smaller_versions)) |
         (df["from_version"].isna()) |
         (df["from_version"] == "")
     ]
