@@ -30,16 +30,18 @@ apply_custom_styles()
 st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
 
 
-def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None):
+def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None, all_columns: list = None, table_key: str = "default"):
     """
     使用 AgGrid 渲染可排序、分页、横向滚动的表格
 
     Args:
         df: DataFrame 数据
-        columns: 要显示的列
+        columns: 默认显示的列（按从左到右顺序）
         height: 表格高度
         page_size: 默认每页条数
         link_column: 问题单号列名，用于生成"查看详情"按钮
+        all_columns: 所有可选的列名列表（中文，用于字段选择器）
+        table_key: 表格唯一标识，用于区分不同表格的列选择状态
     """
     if columns is None:
         columns = list(df.columns)
@@ -52,6 +54,41 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     if not display_cols:
         st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
+
+    # 初始化列选择状态
+    session_key = f"table_cols_{table_key}"
+    if session_key not in st.session_state:
+        st.session_state[session_key] = display_cols.copy()
+
+    # 如果有可选列配置，添加⚙️按钮
+    if all_columns:
+        col_left, col_right = st.columns([1, 1])
+        with col_right:
+            with st.popover("⚙️", use_container_width=True):
+                st.markdown("**选择展示字段**")
+                st.markdown("---")
+                # 按从左到右顺序显示所有可选列
+                selected = []
+                for col in all_columns:
+                    if col in df.columns:
+                        is_selected = st.checkbox(col, value=(col in st.session_state[session_key]), key=f"{session_key}_{col}")
+                        if is_selected:
+                            selected.append(col)
+                # 确认按钮
+                if st.button("确认", type="primary", use_container_width=True):
+                    if selected:
+                        st.session_state[session_key] = selected
+                    st.rerun()
+                # 重置默认按钮
+                if st.button("恢复默认", use_container_width=True):
+                    st.session_state[session_key] = display_cols.copy()
+                    st.rerun()
+
+        # 使用用户选择的列
+        display_cols = [c for c in st.session_state[session_key] if c in df.columns]
+        if not display_cols:
+            st.warning("请至少选择一个展示字段")
+            return
 
     df_display = df[display_cols].copy()
 
@@ -102,13 +139,13 @@ EN_TO_CN_MAPPING = {
     "from_version": "发现问题版本",
     "discover_iteration": "发现迭代",
     "created_time": "创建时间",
+    "discovered_time": "发现时间",
     "delivery_scenario": "交付场景",
     "valid": "挂起/撤销",
     "discovered_environment": "发现环境",
     "labels": "标签",
     "dev_person": "研发责任人",
     "testOwners": "测试责任人",
-    "discovered_time": "发现时间"
 }
 
 
@@ -525,7 +562,9 @@ def main_content():
             }])
             display_df = pd.concat([display_df, total_row], ignore_index=True)
 
-            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
+                        # 微服务 DI 明细可选字段
+            ms_di_all_cols = ["微服务名", "DI 值", "问题单数", "是否合格"]
+            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, all_columns=ms_di_all_cols, table_key="ms_di")
 
             # 问题单明细（按微服务筛选，可折叠）
             with st.expander("🔍 按微服务查看问题单详情"):
@@ -544,7 +583,9 @@ def main_content():
                         ms_display["_severity_order"] = ms_display["严重程度"].map(severity_order).fillna(99)
                         ms_display = ms_display.sort_values("_severity_order")
                         ms_display = ms_display.drop(columns=["_severity_order"])
-                        aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号")
+                        # 按微服务查看问题单详情可选字段
+                        ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
+                        aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
 
@@ -592,8 +633,10 @@ def main_content():
         # 显示可用的列（按问题单号、环境、标题、严重程度、状态顺序）
         ordered_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景"]
         cols_to_show = [c for c in ordered_cols if c in df_display.columns]
+        # 问题单明细可选字段
+        issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
         if cols_to_show:
-            aggrid_table(df_display[cols_to_show], cols_to_show, height=400, link_column="问题单号")
+            aggrid_table(df_display[cols_to_show], cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
