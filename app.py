@@ -168,7 +168,7 @@ if "versions" not in st.session_state:
 if "sidebar_collapsed" not in st.session_state:
     st.session_state.sidebar_collapsed = False
 
-# 如果侧边栏已折叠，添加CSS隐藏
+# 如果侧边栏已折叠，提供一个按钮让用户可以重新展开
 if st.session_state.sidebar_collapsed:
     st.markdown("""
     <style>
@@ -176,6 +176,10 @@ if st.session_state.sidebar_collapsed:
     [data-testid="stMainBlockContainer"] {width: 100% !important;}
     </style>
     """, unsafe_allow_html=True)
+    # 添加一个展开侧边栏的按钮
+    if st.button("☰ 展开侧边栏"):
+        st.session_state.sidebar_collapsed = False
+        st.rerun()
 
 
 def render_sidebar():
