@@ -277,11 +277,6 @@ def render_sidebar():
                     except Exception as e:
                         st.error(f"加载失败: {e}")
 
-    # 导出按钮
-    st.divider()
-    if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
-        if not st.session_state.df_raw.empty:
-            st.session_state.show_export_dialog = True
 def main_content():
     """主页面内容"""
 
@@ -448,6 +443,11 @@ def main_content():
         # 版本过滤
         st.subheader("🔍 发 现 问 题 版 本 过 滤")
 
+        # 导出按钮
+        if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
+            if not st.session_state.df_raw.empty:
+                st.session_state.show_export_dialog = True
+
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
             selected = st.selectbox(
@@ -468,8 +468,8 @@ def main_content():
                 ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
                 all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
                 filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
-                badge = render_qualified_badge(filtered_qualified)
-                st.markdown(f"版本筛选后合格判定：{badge}")
+                qualified_text = "✅ 合格" if filtered_qualified else "❌ 不合格"
+                st.markdown(f"<span style='font-size: 1.2em; font-weight: bold;'>{qualified_text}</span>", unsafe_allow_html=True)
         else:
             st.info("暂无可用的版本数据")
 
