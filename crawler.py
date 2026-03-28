@@ -91,14 +91,15 @@ class BugCrawler:
 
     def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[int]:
         """触发导出，返回 file_id"""
-        # 先调用 GET 接口（浏览器在导出前会先调用这个）
-        config_url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
-        try:
-            self.session.get(config_url, headers=self._get_headers(), timeout=30, verify=False)
-        except Exception:
-            pass
+        # 只有第一次调用时需要先获取配置
+        if not hasattr(self, '_export_initialized'):
+            config_url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
+            try:
+                self.session.get(config_url, headers=self._get_headers(), timeout=30, verify=False)
+            except Exception:
+                pass
+            self._export_initialized = True
 
-        # 再触发导出
         url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
         payload = self.build_export_payload(domain_id, source_type)
 
