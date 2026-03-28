@@ -251,8 +251,9 @@ def render_sidebar():
                             st.session_state.df_raw = df_raw
                             st.session_state.versions = get_version_list(df_raw)
                             st.session_state.selected_version = "全部"
-                            st.session_state.sidebar_collapsed = True
                             st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
+                            st.session_state.sidebar_collapsed = True
+                            st.rerun()
                         else:
                             st.error("获取数据失败，请检查认证信息或 API 参数")
 
@@ -290,8 +291,9 @@ def render_sidebar():
                                 st.session_state.df_raw = merged
                                 st.session_state.versions = get_version_list(merged)
                                 st.session_state.selected_version = "全部"
-                                st.session_state.sidebar_collapsed = True
                                 st.success(f"成功加载 {len(merged)} 条数据")
+                                st.session_state.sidebar_collapsed = True
+                                st.rerun()
                             else:
                                 st.error("Excel 数据为空")
                         else:
