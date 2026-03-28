@@ -43,12 +43,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         all_columns: 所有可选的列名列表（中文，用于字段选择器）
         table_key: 表格唯一标识，用于区分不同表格的列选择状态
     """
-    if columns is None:
-        columns = list(df.columns)
-
+    st.error(f"[DEBUG] aggrid_table 被调用: table_key={table_key}, link_column={link_column}, all_columns={all_columns}")
     if not AGGRID_AVAILABLE:
+        st.warning("[DEBUG] AGGRID_AVAILABLE=False，使用st.dataframe")
         st.dataframe(df[columns] if columns else df, hide_index=True, use_container_width=True, height=height)
         return
+
+    if columns is None:
+        columns = list(df.columns)
 
     display_cols = [c for c in columns if c in df.columns]
     if not display_cols:
