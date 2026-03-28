@@ -69,43 +69,45 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         st.session_state[session_key] = display_cols.copy()
         st.info(f"[DEBUG] 初始化 session_key={session_key}, 值={st.session_state[session_key]}")
 
-    # 如果有可选列配置，添加⚙️按钮
+    # 如果有可选列配置，添加⚙️按钮（右上角）
     if all_columns:
-        with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
-            # 使用 session_state_dict 存储每个字段的选中状态
-            if list_key not in st.session_state:
-                st.session_state[list_key] = display_cols.copy()
-            if dict_key not in st.session_state:
-                st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
-
-            st.info(f"[DEBUG popover] list_key={list_key}, 当前选中={st.session_state[list_key]}")
-            st.info(f"[DEBUG popover] dict_key={dict_key}, 状态={st.session_state[dict_key]}")
-
-            with st.form(key=f"form_{session_key}"):
-                st.markdown("**选择展示字段**")
-                st.markdown("---")
-                # 按从左到右顺序显示所有可选列
-                for col in all_columns:
-                    if col in df.columns:
-                        is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
-                        st.session_state[dict_key][col] = is_checked
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    submitted = st.form_submit_button("确认", type="primary", use_container_width=True)
-                with col2:
-                    reset = st.form_submit_button("恢复默认", use_container_width=True)
-
-                if submitted:
-                    # 根据字典更新列表
-                    new_list = [col for col in all_columns if col in df.columns and st.session_state[dict_key].get(col, False)]
-                    st.info(f"[DEBUG 确认] new_list={new_list}")
-                    st.session_state[list_key] = new_list
-                    st.rerun()
-                if reset:
+        col_left, col_right = st.columns([5, 1])
+        with col_right:
+            with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
+                # 使用 session_state_dict 存储每个字段的选中状态
+                if list_key not in st.session_state:
+                    st.session_state[list_key] = display_cols.copy()
+                if dict_key not in st.session_state:
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
-                    st.info(f"[DEBUG 重置] dict恢复为={st.session_state[dict_key]}")
-                    st.rerun()
+
+                st.info(f"[DEBUG popover] list_key={list_key}, 当前选中={st.session_state[list_key]}")
+                st.info(f"[DEBUG popover] dict_key={dict_key}, 状态={st.session_state[dict_key]}")
+
+                with st.form(key=f"form_{session_key}"):
+                    st.markdown("**选择展示字段**")
+                    st.markdown("---")
+                    # 按从左到右顺序显示所有可选列
+                    for col in all_columns:
+                        if col in df.columns:
+                            is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
+                            st.session_state[dict_key][col] = is_checked
+
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        submitted = st.form_submit_button("确认", type="primary", use_container_width=True)
+                    with col2:
+                        reset = st.form_submit_button("恢复默认", use_container_width=True)
+
+                    if submitted:
+                        # 根据字典更新列表
+                        new_list = [col for col in all_columns if col in df.columns and st.session_state[dict_key].get(col, False)]
+                        st.info(f"[DEBUG 确认] new_list={new_list}")
+                        st.session_state[list_key] = new_list
+                        st.rerun()
+                    if reset:
+                        st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
+                        st.info(f"[DEBUG 重置] dict恢复为={st.session_state[dict_key]}")
+                        st.rerun()
 
         # 使用用户选择的列
         display_cols = [c for c in st.session_state[list_key] if c in df.columns]
