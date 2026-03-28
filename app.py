@@ -30,7 +30,7 @@ apply_custom_styles()
 st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
 
 
-def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None, all_columns: list = None, table_key: str = "default"):
+def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None, all_columns: list = None, table_key: str = "default", pagination: bool = True):
     """
     使用 AgGrid 渲染可排序、分页、横向滚动的表格
 
@@ -42,6 +42,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         link_column: 问题单号列名，用于生成"查看详情"按钮
         all_columns: 所有可选的列名列表（中文，用于字段选择器）
         table_key: 表格唯一标识，用于区分不同表格的列选择状态
+        pagination: 是否启用分页，False则显示所有行
     """
     if not AGGRID_AVAILABLE:
         st.dataframe(df[columns] if columns else df, hide_index=True, use_container_width=True, height=height)
@@ -108,29 +109,42 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
-        # 使用 markdown 链接实现按钮效果
+        # 生成HTML链接
         df_display["问题详情链接"] = df[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="display:inline-block;background-color:#1E3A8A;color:white;padding:4px 10px;border-radius:4px;font-size:12px;text-decoration:none;">查看详情</span></a>'
+            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="color:#1E3A8A;text-decoration:none;font-weight:600;">查看详情</span></a>'
         )
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
 
+    # 为HTML列启用HTML渲染
+    if link_column and link_column in df.columns:
+        # 找到"问题详情链接"列的index
+        if "问题详情链接" in df_display.columns:
+            try:
+                gb.configure_column("问题详情链接", cellRenderer='agTextCellRenderer')
+            except Exception:
+                pass
+
     # 分页配置
-    try:
-        gb.configure_pagination(
-            paginationAutoPageSize=False,
-            paginationPageSize=page_size
-        )
-    except Exception:
-        pass
+    if pagination:
+        try:
+            gb.configure_pagination(
+                paginationAutoPageSize=False,
+                paginationPageSize=page_size
+            )
+        except Exception:
+            pass
 
     grid_options = gb.build()
 
-    # 确保分页生效
-    grid_options['pagination'] = True
-    grid_options['paginationPageSize'] = page_size
-    grid_options['suppressPaginationPanel'] = False
+    if pagination:
+        grid_options['pagination'] = True
+        grid_options['paginationPageSize'] = page_size
+        grid_options['suppressPaginationPanel'] = False
+    else:
+        grid_options['pagination'] = False
+        grid_options['suppressPaginationPanel'] = True
 
     # 配置列宽自适应
     grid_options['autoSizeColumns'] = True
@@ -585,7 +599,7 @@ def main_content():
             }])
             display_df = pd.concat([display_df, total_row], ignore_index=True)
 
-            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
+            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, pagination=False)
 
             # 问题单明细（按微服务筛选，可折叠）
             with st.expander("🔍 按微服务查看问题单详情"):
