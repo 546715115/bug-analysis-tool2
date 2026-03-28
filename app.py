@@ -385,7 +385,7 @@ def main_content():
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
         overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1.2])
         col1.metric("云服务", "Cloud Eye")
         col2.metric("总 DI 值", cloud_di_info["di"])
         col3.metric("总问题单", cloud_di_info["issue_count"])
@@ -438,15 +438,16 @@ def main_content():
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
 
+        # 导出按钮 - 使用蓝色柔和色调
+        with col5:
+            if st.button("📥 导出", use_container_width=True):
+                if not st.session_state.df_raw.empty:
+                    st.session_state.show_export_dialog = True
+
         st.divider()
 
         # 版本过滤
         st.subheader("🔍 发 现 问 题 版 本 过 滤")
-
-        # 导出按钮
-        if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
-            if not st.session_state.df_raw.empty:
-                st.session_state.show_export_dialog = True
 
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
