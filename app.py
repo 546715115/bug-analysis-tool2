@@ -108,8 +108,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
-        df_display["查看详情"] = df[link_column].apply(
-            lambda x: f'<button onclick="window.open(\'https://clouddevops.huawei.com/#/bug/{x}\', \'_blank\')" style="background-color: #1E3A8A; color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px;">查看详情</button>'
+        # 使用 markdown 链接实现按钮效果
+        df_display["问题详情链接"] = df[link_column].apply(
+            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank" style="display: inline-block; background-color: #1E3A8A; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-size: 12px; text-align: center;">查看详情</a>'
         )
 
     # 使用 from_dataframe 方式构建
