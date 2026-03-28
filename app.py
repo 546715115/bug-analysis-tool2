@@ -456,8 +456,7 @@ def main_content():
             st.markdown(f"<span style='font-size:0.8em'>💡</span> 合格标准: {qualified_html}", unsafe_allow_html=True)
             with st.popover("💡"):
                 st.markdown("**合格标准：**")
-                st.markdown("- 云服务 DI < 20 合格")
-                st.markdown("- 微服务 DI < 5 合格")
+                st.markdown("云服务 DI < 20 **且** 微服务 DI < 5，同时满足方为合格")
                 st.markdown("")
                 # SLA阈值和DI权重左右排列
                 col_left, col_right = st.columns(2)
