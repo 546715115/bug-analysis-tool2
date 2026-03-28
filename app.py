@@ -494,6 +494,21 @@ def main_content():
             display_df["是否合格"] = display_df["qualified"].apply(lambda x: "✅ 合格" if x else "❌ 不合格")
             display_df = display_df.drop(columns=["qualified"])
 
+            # 添加总计行
+            total_di = display_df["DI 值"].sum()
+            total_issues = display_df["问题单数"].sum()
+            # 合格标准：所有微服务 DI < 5 才合格
+            all_qualified = display_df["是否合格"].apply(lambda x: "✅" in x).all()
+            total_qualified = "✅ 合格" if all_qualified else "❌ 不合格"
+
+            total_row = pd.DataFrame([{
+                "微服务名": "总计",
+                "DI 值": round(total_di, 1),
+                "问题单数": total_issues,
+                "是否合格": total_qualified
+            }])
+            display_df = pd.concat([display_df, total_row], ignore_index=True)
+
             aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
 
             # 问题单明细（按微服务筛选，可折叠）
