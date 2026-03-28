@@ -110,36 +110,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
-        # 存储bug单号
-        df_display["问题详情链接"] = df[link_column].apply(lambda x: x)
+        # 生成HTML格式的查看详情链接
+        df_display["问题详情链接"] = df[link_column].apply(
+            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><button style="background-color:#1E3A8A;color:white;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;">查看详情</button></a>'
+        )
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
-
-    # 如果有链接列，配置JS cellRenderer创建真正按钮
-    if link_column and link_column in df.columns and "问题详情链接" in df_display.columns:
-        try:
-            js_code = """function(params) {
-                if (params.value) {
-                    var button = document.createElement('button');
-                    button.innerHTML = '查看详情';
-                    button.style.backgroundColor = '#1E3A8A';
-                    button.style.color = 'white';
-                    button.style.border = 'none';
-                    button.style.borderRadius = '4px';
-                    button.style.padding = '4px 10px';
-                    button.style.cursor = 'pointer';
-                    button.style.fontSize = '12px';
-                    button.onclick = function() {
-                        window.open('https://clouddevops.huawei.com/#/bug/' + params.value, '_blank');
-                    };
-                    return button;
-                }
-                return '';
-            }"""
-            gb.configure_column("问题详情链接", cellRenderer=js_code)
-        except Exception:
-            pass
 
     # 分页配置
     if pagination:
@@ -162,10 +139,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         grid_options['pagination'] = False
         grid_options['suppressPaginationPanel'] = True
 
-    # 表格布局配置，让表格占满宽度
-    grid_options['domLayout'] = 'normal'
-    grid_options['suppressColumnVirtualisation'] = False
-
     AgGrid(
         df_display,
         gridOptions=grid_options,
@@ -177,25 +150,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         unsafe_allow_html=True,
         enableCellHtml=True
     )
-
-    # 添加CSS让表格占满宽度且内容居中
-    st.markdown("""
-    <style>
-    .ag-root-wrapper {
-        width: 100% !important;
-    }
-    .ag-cell {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    .ag-header-cell {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 
 # 英文到中文的列名映射（用于导出，保持与导入格式一致）
