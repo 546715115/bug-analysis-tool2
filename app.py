@@ -562,9 +562,7 @@ def main_content():
             }])
             display_df = pd.concat([display_df, total_row], ignore_index=True)
 
-                        # 微服务 DI 明细可选字段
-            ms_di_all_cols = ["微服务名", "DI 值", "问题单数", "是否合格"]
-            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, all_columns=ms_di_all_cols, table_key="ms_di")
+                        aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
 
             # 问题单明细（按微服务筛选，可折叠）
             with st.expander("🔍 按微服务查看问题单详情"):
