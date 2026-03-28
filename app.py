@@ -110,38 +110,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
-        # 生成HTML链接
+        # 直接存储URL，让用户点击跳转
         df_display["问题详情链接"] = df[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="color:#1E3A8A;font-weight:600;">查看详情</span></a>'
+            lambda x: f"https://clouddevops.huawei.com/#/bug/{x}"
         )
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
-
-    # 如果有链接列，配置列的渲染方式和内容居中
-    if link_column and link_column in df.columns and "问题详情链接" in df_display.columns:
-        try:
-            # 使用JS代码渲染为可点击按钮
-            js_code = """function(params) {
-                if (params.value) {
-                    var link = document.createElement('a');
-                    link.href = params.value;
-                    link.target = '_blank';
-                    link.innerHTML = '<button style="background-color:#1E3A8A;color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">查看详情</button>';
-                    return link;
-                }
-                return '';
-            }"""
-            gb.configure_column("问题详情链接", cellRenderer=js_code, cellStyle={'textAlign': 'center'})
-        except Exception:
-            pass
-    else:
-        # 其他列也居中
-        try:
-            for col in display_cols:
-                gb.configure_column(col, cellStyle={'textAlign': 'center'})
-        except Exception:
-            pass
 
     # 分页配置
     if pagination:
@@ -159,14 +134,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         grid_options['pagination'] = True
         grid_options['paginationPageSize'] = page_size
         grid_options['suppressPaginationPanel'] = False
-        # 分页选择器选项
         grid_options['paginationPageSizeSelector'] = [10, 20, 50, 100]
     else:
         grid_options['pagination'] = False
         grid_options['suppressPaginationPanel'] = True
-
-    # 表格宽度配置
-    grid_options['autoSizeColumns'] = True
 
     AgGrid(
         df_display,
@@ -180,16 +151,18 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         enableCellHtml=True
     )
 
-    # 添加CSS让表格占满宽度且内容居中
+    # 添加CSS让表格内容居中
     st.markdown("""
     <style>
-    .ag-root-wrapper {
-        width: 100% !important;
-    }
     .ag-cell {
         display: flex !important;
-        align-items: center !important;
         justify-content: center !important;
+        align-items: center !important;
+    }
+    .ag-header-cell {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
     </style>
     """, unsafe_allow_html=True)
