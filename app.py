@@ -25,59 +25,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# 侧边栏状态初始化
-if "sidebar_collapsed" not in st.session_state:
-    st.session_state.sidebar_collapsed = False
-
-# 检查URL参数来切换侧边栏状态
-query_params = st.query_params
-if "sidebar" in query_params:
-    if query_params["sidebar"] == "0":
-        st.session_state.sidebar_collapsed = True
-    else:
-        st.session_state.sidebar_collapsed = False
-    # 清除参数避免刷新后状态反转
-    st.query_params.clear()
-
-# 侧边栏折叠按钮 - 固定在左上角，不占用布局空间
-st.markdown("""
-<style>
-.sidebar-toggle-btn {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    z-index: 999999;
-    font-size: 14px;
-    background: #f0f2f6;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 6px 12px;
-    cursor: pointer;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
-}
-.sidebar-toggle-btn:hover {
-    background: #e6e8eb;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# 侧边栏切换按钮 - 使用URL参数持久化状态
-button_label = "✕ 收起" if st.session_state.sidebar_collapsed else "☰ 菜单"
-toggle_url = "?sidebar=0" if not st.session_state.sidebar_collapsed else "?sidebar=1"
-st.markdown(f"""
-<a href="{toggle_url}"><button class="sidebar-toggle-btn">{button_label}</button></a>
-""", unsafe_allow_html=True)
-
-# 初始化侧边栏显示状态
-if st.session_state.sidebar_collapsed:
-    st.markdown("""
-    <style>
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 apply_custom_styles()
 
 st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
@@ -609,7 +556,7 @@ def main_content():
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
     else:
-        st.info("👈 请先点击左上角 ☰ 按钮展开侧边栏，导入数据")
+        st.info("👈 请先在左侧展开侧边栏，导入数据")
 
         st.markdown("""
         ### 使用说明
