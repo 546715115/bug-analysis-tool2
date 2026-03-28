@@ -55,21 +55,29 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
 
+    # DEBUG: 打印函数调用参数
+    st.info(f"[DEBUG aggrid_table] table_key={table_key}, link_column={link_column}, all_columns={all_columns}, df行数={len(df)}, 默认列={display_cols}")
+
     # 初始化列选择状态
     session_key = f"table_cols_{table_key}"
+    dict_key = f"{session_key}_dict"
+    list_key = session_key
+
     if session_key not in st.session_state:
         st.session_state[session_key] = display_cols.copy()
+        st.info(f"[DEBUG] 初始化 session_key={session_key}, 值={st.session_state[session_key]}")
 
     # 如果有可选列配置，添加⚙️按钮
     if all_columns:
         with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
             # 使用 session_state_dict 存储每个字段的选中状态
-            dict_key = f"{session_key}_dict"
-            list_key = session_key
             if list_key not in st.session_state:
                 st.session_state[list_key] = display_cols.copy()
             if dict_key not in st.session_state:
                 st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
+
+            st.info(f"[DEBUG popover] list_key={list_key}, 当前选中={st.session_state[list_key]}")
+            st.info(f"[DEBUG popover] dict_key={dict_key}, 状态={st.session_state[dict_key]}")
 
             with st.form(key=f"form_{session_key}"):
                 st.markdown("**选择展示字段**")
@@ -89,25 +97,33 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                 if submitted:
                     # 根据字典更新列表
                     new_list = [col for col in all_columns if col in df.columns and st.session_state[dict_key].get(col, False)]
+                    st.info(f"[DEBUG 确认] new_list={new_list}")
                     st.session_state[list_key] = new_list
                     st.rerun()
                 if reset:
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns if col in df.columns}
+                    st.info(f"[DEBUG 重置] dict恢复为={st.session_state[dict_key]}")
                     st.rerun()
 
         # 使用用户选择的列
         display_cols = [c for c in st.session_state[list_key] if c in df.columns]
+        st.info(f"[DEBUG] 最终display_cols={display_cols}")
         if not display_cols:
             st.warning("请至少选择一个展示字段")
             return
 
     df_display = df[display_cols].copy()
+    st.info(f"[DEBUG] df_display列={list(df_display.columns)}, df_display行数={len(df_display)}")
 
     # 如果有链接列，在最后添加"查看详情"按钮列
     if link_column and link_column in df.columns:
+        st.info(f"[DEBUG 查看详情] link_column={link_column} 在df.columns中, 将添加按钮列")
         df_display["查看详情"] = df[link_column].apply(
             lambda x: f'<button onclick="window.open(\'https://clouddevops.huawei.com/#/bug/{x}\', \'_blank\')" style="background-color: #1E3A8A; color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px;">查看详情</button>'
         )
+    else:
+        if link_column:
+            st.warning(f"[DEBUG 查看详情] link_column={link_column} 不在df.columns中! df.columns={list(df.columns)}")
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display)
