@@ -373,9 +373,14 @@ def main_content():
         col2.metric("总 DI 值", cloud_di_info["di"])
         col3.metric("总问题单", cloud_di_info["issue_count"])
 
-        qualified_html = render_qualified_badge(cloud_di_info["qualified"])
-        col4.markdown(f"合格标准: {qualified_html}", unsafe_allow_html=True)
-        st.caption("💡 云服务 DI < 20 合格；微服务 DI < 5 合格")
+        # 合格标准 - 带tooltip图标
+        with col4:
+            qualified_html = render_qualified_badge(cloud_di_info["qualified"])
+            st.markdown(f"合格标准: {qualified_html}", unsafe_allow_html=True)
+            with st.popover("❓"):
+                st.markdown("**合格标准：**")
+                st.markdown("- 云服务 DI < 20 合格")
+                st.markdown("- 微服务 DI < 5 合格")
 
         st.divider()
 
