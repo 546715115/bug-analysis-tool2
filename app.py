@@ -385,14 +385,15 @@ def main_content():
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
         overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
 
-        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1.2])
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("云服务", "Cloud Eye")
         col2.metric("总 DI 值", cloud_di_info["di"])
         col3.metric("总问题单", cloud_di_info["issue_count"])
 
-        # 合格标准 - 点击文字展开tips
+        # 合格标准和导出按钮都在第四列
         with col4:
-            with st.popover("合格标准"):
+            # 第一行：合格标准
+            with st.popover("合格标准", use_container_width=True):
                 st.markdown("**合格标准：**")
                 st.markdown("云服务 DI < 20 **且** 微服务 DI < 5，同时满足方为合格")
                 st.markdown("")
@@ -437,10 +438,8 @@ def main_content():
                 </table>
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
-
-        # 导出按钮 - 使用蓝色柔和色调
-        with col5:
-            if st.button("📥 导出", use_container_width=True):
+            # 第二行：导出按钮
+            if st.button("📥 导出版本有效DI-Excel", use_container_width=True):
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
 
