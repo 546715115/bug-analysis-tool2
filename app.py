@@ -508,9 +508,14 @@ def main_content():
                         ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
                         # 按 DI 规则过滤
                         ms_issues_filtered = filter_by_di_rules(ms_issues)
-                        ms_display = ms_issues_filtered[["number", "title", "severity_level", "status"]].copy()
-                        ms_display.columns = ["问题单号", "标题", "严重程度", "状态"]
-                        aggrid_table(ms_display, height=300, link_column="问题单号")
+                        ms_display = ms_issues_filtered[["number", "discovered_environment", "title", "severity_level", "status"]].copy()
+                        ms_display.columns = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
+                        # 按严重程度排序：致命 > 严重 > 一般 > 提示
+                        severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
+                        ms_display["_severity_order"] = ms_display["严重程度"].map(severity_order).fillna(99)
+                        ms_display = ms_display.sort_values("_severity_order")
+                        ms_display = ms_display.drop(columns=["_severity_order"])
+                        aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号")
         else:
             st.info("暂无数据")
 
@@ -525,6 +530,7 @@ def main_content():
         # 英文到中文的显示映射
         en_to_cn_display = {
             "number": "问题单号",
+            "discovered_environment": "问题单环境",
             "title": "标题",
             "severity_level": "严重程度",
             "status": "问题状态",
@@ -548,10 +554,17 @@ def main_content():
 
         df_display = df_di_filtered.rename(columns=col_rename) if col_rename else df_di_filtered
 
-        # 显示可用的列
-        cols_to_show = [c for c in display_cols if c in df_display.columns]
+        # 按严重程度排序：致命 > 严重 > 一般 > 提示
+        severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
+        df_display["_severity_order"] = df_display["严重程度"].map(severity_order).fillna(99)
+        df_display = df_display.sort_values("_severity_order")
+        df_display = df_display.drop(columns=["_severity_order"])
+
+        # 显示可用的列（按问题单号、环境、标题、严重程度、状态顺序）
+        ordered_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景"]
+        cols_to_show = [c for c in ordered_cols if c in df_display.columns]
         if cols_to_show:
-            aggrid_table(df_display[cols_to_show], height=400, link_column="问题单号")
+            aggrid_table(df_display[cols_to_show], cols_to_show, height=400, link_column="问题单号")
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
