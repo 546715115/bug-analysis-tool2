@@ -168,6 +168,7 @@ if not st.session_state.df_raw.empty:
 
     qualified_html = render_qualified_badge(cloud_di_info["qualified"])
     col4.markdown(f"合格标准: {qualified_html}", unsafe_allow_html=True)
+    st.caption("💡 云服务 DI < 20 合格；微服务 DI < 5 合格")
 
     st.divider()
 
@@ -175,19 +176,16 @@ if not st.session_state.df_raw.empty:
     st.subheader("🔍 发 现 问 题 版 本 过 滤")
 
     if st.session_state.versions:
-        cols = st.columns(len(st.session_state.versions) + 1)
-
-        # 全部按钮
-        if cols[0].button("全部", type="primary" if st.session_state.selected_version == "全部" else "secondary"):
-            st.session_state.selected_version = "全部"
+        version_options = ["全部"] + sorted(st.session_state.versions)
+        selected = st.selectbox(
+            "选择版本",
+            options=version_options,
+            index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
+            label_visibility="collapsed"
+        )
+        if selected != st.session_state.selected_version:
+            st.session_state.selected_version = selected
             st.rerun()
-
-        # 各版本按钮
-        for i, version in enumerate(st.session_state.versions):
-            if cols[i + 1].button(version, type="primary" if st.session_state.selected_version == version else "secondary"):
-                st.session_state.selected_version = version
-                st.rerun()
-
         st.caption(f"当前选中：{st.session_state.selected_version}")
     else:
         st.info("暂无可用的版本数据")
