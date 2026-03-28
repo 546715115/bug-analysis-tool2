@@ -122,15 +122,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     if pagination:
         try:
             gb.configure_pagination(
-                paginationAutoPageSize=True,  # 自动设置分页大小以适应数据
+                paginationAutoPageSize=False,  # False才显示选择器
                 paginationPageSize=page_size,
                 paginationPageSizeSelector=[10, 20, 50, 100]
             )
         except Exception:
-            # 如果不支持paginationPageSizeSelector，回退
             try:
                 gb.configure_pagination(
-                    paginationAutoPageSize=True,
+                    paginationAutoPageSize=False,
                     paginationPageSize=page_size
                 )
             except Exception:
@@ -146,8 +145,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         grid_options['pagination'] = False
         grid_options['suppressPaginationPanel'] = True
 
-    # 配置列宽自适应
+    # 配置列宽自适应，让表格占满宽度
     grid_options['autoSizeColumns'] = True
+    # 设置表格布局为自动适应高度和宽度
+    grid_options['domLayout'] = 'autoHeight'
 
     AgGrid(
         df_display,
