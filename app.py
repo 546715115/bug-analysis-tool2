@@ -443,6 +443,10 @@ def main_content():
         st.subheader("☁️ 云服务 DI 概览")
 
         cloud_di_info = calculate_cloud_di(df_all)
+        ms_di_all = calculate_microservice_di_with_count(df_all)
+        # 合格标准：云服务 DI < 20 且 所有微服务 DI < 5
+        all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
+        overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("云服务", "Cloud Eye")
@@ -451,7 +455,7 @@ def main_content():
 
         # 合格标准 - 带tooltip图标
         with col4:
-            qualified_html = render_qualified_badge(cloud_di_info["qualified"])
+            qualified_html = render_qualified_badge(overall_qualified)
             # 小灯泡图标放在"合格标准"前面
             st.markdown(f"<span style='font-size:0.8em'>💡</span> 合格标准: {qualified_html}", unsafe_allow_html=True)
             with st.popover("💡"):
@@ -517,6 +521,16 @@ def main_content():
                 st.session_state.selected_version = selected
                 st.rerun()
             st.caption(f"当前选中：{st.session_state.selected_version}")
+
+            # 版本筛选后显示合格状态（仅在有筛选时显示）
+            if st.session_state.selected_version != "全部":
+                df_filtered_check = filter_by_version(df_all, st.session_state.selected_version)
+                cloud_di_filtered = calculate_cloud_di(df_filtered_check)
+                ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
+                all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
+                filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
+                badge = render_qualified_badge(filtered_qualified)
+                st.markdown(f"版本筛选后合格判定：{badge}")
         else:
             st.info("暂无可用的版本数据")
 
