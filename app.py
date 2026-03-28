@@ -468,8 +468,8 @@ def main_content():
                 ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
                 all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
                 filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
-                qualified_text = "✅ 合格" if filtered_qualified else "❌ 不合格"
-                st.markdown(f"<span style='font-size: 1.2em; font-weight: bold;'>{qualified_text}</span>", unsafe_allow_html=True)
+                badge_html = render_qualified_badge(filtered_qualified)
+                st.markdown(f"<span style='font-size: 1.2em;'>{badge_html}</span>", unsafe_allow_html=True)
         else:
             st.info("暂无可用的版本数据")
 
