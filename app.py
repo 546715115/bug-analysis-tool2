@@ -63,8 +63,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         # 把原列替换成HTML链接
         df_display[link_column] = df_display["_link"]
         df_display = df_display.drop(columns=["_link"])
-        # 更新显示列
-        display_cols = [c if c != link_column else link_column for c in display_cols]
 
     # 使用 from_dataframe 方式构建
     gb = GridOptionsBuilder.from_dataframe(df_display[display_cols])
