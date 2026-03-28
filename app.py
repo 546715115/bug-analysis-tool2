@@ -565,7 +565,7 @@ def main_content():
             }])
             display_df = pd.concat([display_df, total_row], ignore_index=True)
 
-                        aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
+            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300)
 
             # 问题单明细（按微服务筛选，可折叠）
             with st.expander("🔍 按微服务查看问题单详情"):
