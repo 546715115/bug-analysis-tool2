@@ -545,7 +545,7 @@ def main_content():
         st.divider()
 
         # 版本过滤
-        st.subheader("🔍 发 现 问 题 版 本")
+        st.markdown('<p class="section-header">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
 
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
