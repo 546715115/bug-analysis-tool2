@@ -1,6 +1,7 @@
 # di_calculator.py
 import pandas as pd
-from typing import Dict, Optional
+from datetime import datetime
+from typing import Dict, Tuple
 
 # DI 权重配置
 SEVERITY_DI = {
@@ -38,25 +39,19 @@ CES_MICROSERVICES = [
     "CES-Console"
 ]
 
-# 生产环境状态（待验收/修复完成不算 DI）
-PRODUCTION_EXCLUDED_STATUS = ["待验收", "修复完成"]
-
-# 生产环境状态（定位中/修复中按 SLA 计算）
-PRODUCTION_SLA_STATUS = ["定位中", "修复中"]
-
-# 生产环境状态（待提交按创建时间）
-PRODUCTION_SUBMIT_STATUS = ["待提交"]
-
-# 交付场景（门禁不算）
+# 交付场景（HCS 不算 DI）
 DELIVERY_EXCLUDED = ["HCS"]
+
 
 def get_severity_di(severity: str) -> float:
     """获取严重程度对应的 DI 权重"""
     return SEVERITY_DI.get(severity, 0)
 
+
 def get_sla_threshold(severity: str) -> int:
     """获取严重程度对应的 SLA 阈值（天）"""
     return SLA_THRESHOLDS.get(severity, 30)
+
 
 def is_microservice(name: str) -> bool:
     """判断是否为 CES 微服务（模糊匹配）"""
@@ -69,11 +64,15 @@ def is_microservice(name: str) -> bool:
             return True
     return False
 
+
 def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
     """
-    CCB 挂起过滤
+    CCB 挂起过滤（预处理阶段）
     - 非生产环境 + 挂起 → 剔除
     - 生产环境 → 保留
+
+    注意：此函数仅处理 CCB 挂起规则
+    状态规则（哪些状态算DI）在 calculate_di_for_issue 中单独处理
     """
     if df.empty:
         return df
@@ -89,37 +88,120 @@ def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
 
     return result
 
-def apply_delivery_scenario(df: pd.DataFrame) -> pd.DataFrame:
+
+def is_delivery_excluded(delivery_scenario: str) -> bool:
+    """判断交付场景是否排除 DI 计算"""
+    if pd.isna(delivery_scenario) or str(delivery_scenario).strip() == "":
+        return False  # 空 = 正常算
+    return str(delivery_scenario) in DELIVERY_EXCLUDED
+
+
+def should_count_di(status: str, stage: str, discovered_environment: str) -> Tuple[bool, str]:
     """
-    交付场景处理
-    - HCS → DI 不算
-    - 其他/空 → 正常算
+    判断问题单是否应该统计 DI
+
+    Returns:
+        (should_count, reason)
     """
-    if df.empty or "delivery_scenario" not in df.columns:
-        return df
+    if pd.isna(status):
+        return False, "status为空"
 
-    result = df.copy()
+    status = str(status).strip()
+    stage = str(stage).strip() if not pd.isna(stage) else ""
+    env = str(discovered_environment).strip() if not pd.isna(discovered_environment) else ""
 
-    # 为 HCS 的问题单设置 DI=0
-    hcs_mask = result["delivery_scenario"] == "HCS"
-    result.loc[hcs_mask, "_di_contribution"] = 0
+    # 非生产环境
+    if env == "非生产环境":
+        # 待提交、已关闭 不统计
+        if status == "待提交" and stage == "":
+            return False, "非生产-待提交"
+        if status == "已关闭" and stage == "":
+            return False, "非生产-已关闭"
+        # 其他（非生产）都统计
+        return True, "非生产-统计"
 
-    return result
+    # 生产环境
+    if env == "生产环境":
+        # 待验收、已关闭、修复+修复完成 不统计
+        if status == "待验收" and stage == "":
+            return False, "生产-待验收"
+        if status == "已关闭" and stage == "":
+            return False, "生产-已关闭"
+        if status == "修复" and stage == "修复完成":
+            return False, "生产-修复完成"
+        # 待确认、待修复、修复+修复中、修复+修复测试 统计
+        return True, "生产-统计"
 
-def calculate_di_for_issue(severity: str) -> float:
-    """计算单个问题的 DI 值"""
-    return get_severity_di(severity)
+    # 环境为空或其他未知情况，默认统计
+    return True, "环境未知-统计"
+
+
+def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
+    """
+    计算单个问题单的 DI 值
+
+    规则：
+    1. 判断是否统计 DI（根据 status + stage + discovered_environment）
+    2. 判断是否 SLA 超期（当前时间 - 发现时间 > 阈值）
+    3. 判断交付场景（HCS 不算）
+    """
+    severity = row.get("severity_level", "")
+    status = row.get("status", "")
+    stage = row.get("stage", "")
+    discovered_env = row.get("discovered_environment", "")
+    discovered_time = row.get("discovered_time", None)
+    delivery_scenario = row.get("delivery_scenario", "")
+
+    # 1. 判断是否应该统计
+    should_count, reason = should_count_di(status, stage, discovered_env)
+    if not should_count:
+        return 0.0
+
+    # 2. 交付场景判断
+    if is_delivery_excluded(delivery_scenario):
+        return 0.0
+
+    # 3. SLA 超期判断
+    threshold = get_sla_threshold(severity)
+
+    # 如果没有发现时间，无法判断 SLA，默认按超期处理（算 DI）
+    if pd.isna(discovered_time) or str(discovered_time).strip() == "":
+        # 无法判断 SLA，默认算 DI
+        return get_severity_di(severity)
+
+    # 解析发现时间
+    try:
+        if isinstance(discovered_time, str):
+            # 尝试解析字符串时间
+            discovered_dt = pd.to_datetime(discovered_time)
+        else:
+            discovered_dt = discovered_time
+
+        days_elapsed = (current_time - discovered_dt).total_seconds() / (24 * 3600)
+
+        if days_elapsed > threshold:
+            return get_severity_di(severity)
+        else:
+            return 0.0  # SLA 未超期
+    except Exception:
+        # 解析失败，默认算 DI
+        return get_severity_di(severity)
+
 
 def calculate_cloud_di(df: pd.DataFrame) -> Dict:
     """计算云服务级别 DI"""
     if df.empty:
         return {"di": 0, "issue_count": 0, "qualified": True}
 
+    current_time = datetime.now()
     total_di = 0
-    for _, row in df.iterrows():
-        total_di += calculate_di_for_issue(row.get("severity_level", ""))
+    issue_count = 0
 
-    issue_count = len(df)
+    for _, row in df.iterrows():
+        di = calculate_di_for_issue(row, current_time)
+        total_di += di
+        issue_count += 1
+
     qualified = total_di < QUALIFICATION_THRESHOLDS["云服务"]
 
     return {
@@ -127,6 +209,7 @@ def calculate_cloud_di(df: pd.DataFrame) -> Dict:
         "issue_count": issue_count,
         "qualified": qualified
     }
+
 
 def calculate_microservice_di(df: pd.DataFrame) -> pd.DataFrame:
     """按微服务分组统计 DI"""
@@ -139,12 +222,14 @@ def calculate_microservice_di(df: pd.DataFrame) -> pd.DataFrame:
     if ces_df.empty:
         return pd.DataFrame(columns=["assigned_to_domain", "di_sum", "issue_count", "qualified"])
 
+    current_time = datetime.now()
+
     # 按责任服务分组
     grouped = ces_df.groupby("assigned_to_domain")
 
     results = []
     for domain, group in grouped:
-        di_sum = sum(calculate_di_for_issue(row.get("severity_level", "")) for _, row in group.iterrows())
+        di_sum = sum(calculate_di_for_issue(row, current_time) for _, row in group.iterrows())
         issue_count = len(group)
         qualified = di_sum < QUALIFICATION_THRESHOLDS["微服务"]
 
@@ -158,6 +243,7 @@ def calculate_microservice_di(df: pd.DataFrame) -> pd.DataFrame:
     result_df = pd.DataFrame(results)
     result_df = result_df.sort_values("di_sum", ascending=False)
     return result_df.reset_index(drop=True)
+
 
 def get_issue_detail_url(issue_number: str) -> str:
     """生成问题单详情跳转链接"""
