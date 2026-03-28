@@ -86,7 +86,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         allow_unsafe_jscode=True,
         reload_data=True,
         enable_enterprise_modules=False,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
+        enableCellHtml=True,
+        suppressCellFocus=True
     )
 
 
