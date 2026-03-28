@@ -20,7 +20,7 @@ except ImportError:
     AGGRID_AVAILABLE = False
 
 st.set_page_config(
-    page_title="DI 统计工具",
+    page_title="CES DI 统计工具",
     page_icon="📊",
     layout="wide"
 )
@@ -52,7 +52,7 @@ st.markdown("""
 
 apply_custom_styles()
 
-st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
 
 
 def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None):
@@ -257,7 +257,7 @@ if not st.session_state.sidebar_expanded:
 
 def render_sidebar():
     """渲染侧边栏内容"""
-    st.title("DI 统计工具")
+    st.title("CES DI 统计工具")
 
     # API 导入（默认折叠）
     with st.expander("🔗 API 导入", expanded=False):
