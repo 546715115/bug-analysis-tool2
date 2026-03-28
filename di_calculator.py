@@ -245,6 +245,46 @@ def calculate_microservice_di(df: pd.DataFrame) -> pd.DataFrame:
     return result_df.reset_index(drop=True)
 
 
+def calculate_microservice_di_with_count(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    按微服务分组统计 DI
+    问题单数 = 按 DI 统计规则过滤后的问题单数（DI > 0）
+    """
+    if df.empty or "assigned_to_domain" not in df.columns:
+        return pd.DataFrame()
+
+    # 只保留 CES 微服务
+    ces_df = df[df["assigned_to_domain"].apply(is_microservice)].copy()
+
+    if ces_df.empty:
+        return pd.DataFrame(columns=["assigned_to_domain", "di_sum", "issue_count", "qualified"])
+
+    current_time = datetime.now()
+
+    # 按责任服务分组
+    grouped = ces_df.groupby("assigned_to_domain")
+
+    results = []
+    for domain, group in grouped:
+        # 计算每个问题单的 DI
+        di_list = [calculate_di_for_issue(row, current_time) for _, row in group.iterrows()]
+        di_sum = sum(di_list)
+        # 问题单数 = DI > 0 的问题单数
+        issue_count = sum(1 for d in di_list if d > 0)
+        qualified = di_sum < QUALIFICATION_THRESHOLDS["微服务"]
+
+        results.append({
+            "assigned_to_domain": domain,
+            "di_sum": round(di_sum, 1),
+            "issue_count": issue_count,
+            "qualified": qualified
+        })
+
+    result_df = pd.DataFrame(results)
+    result_df = result_df.sort_values("di_sum", ascending=False)
+    return result_df.reset_index(drop=True)
+
+
 def get_issue_detail_url(issue_number: str) -> str:
     """生成问题单详情跳转链接"""
     return f"https://clouddevops.huawei.com/#/bug/{issue_number}"

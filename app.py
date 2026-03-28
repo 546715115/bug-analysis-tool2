@@ -7,11 +7,14 @@ from io import BytesIO
 from config import build_auth_headers
 from crawler import BugCrawler
 from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version
-from di_calculator import calculate_cloud_di, calculate_microservice_di, filter_production_issues, get_issue_detail_url, is_microservice
+from di_calculator import (
+    calculate_cloud_di, calculate_microservice_di, calculate_microservice_di_with_count,
+    filter_production_issues, get_issue_detail_url, is_microservice
+)
 from styles import apply_custom_styles, render_qualified_badge
 
 try:
-    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
+    from st_aggrid import AgGrid, GridOptionsBuilder
     AGGRID_AVAILABLE = True
 except ImportError:
     AGGRID_AVAILABLE = False
@@ -22,6 +25,28 @@ st.set_page_config(
     layout="wide"
 )
 
+# 自定义CSS：侧边栏默认折叠
+st.markdown("""
+<style>
+    [data-testid="stSidebar"][class="streamlit-sidebar"] {
+        width: 250px !important;
+    }
+    /* 侧边栏折叠状态 */
+    .sidebar-collapsed [data-testid="stSidebar"] {
+        width: 0px !important;
+        overflow: hidden;
+    }
+    .sidebar-collapsed [data-testid="stSidebarContent"] {
+        display: none;
+    }
+</style>
+<script>
+    if (window.location.hash !== "#sidebar Expanded") {
+        document.querySelector('[data-testid="stSidebar"]').classList.add('sidebar-collapsed');
+    }
+</script>
+""", unsafe_allow_html=True)
+
 apply_custom_styles()
 
 st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=True)
@@ -30,49 +55,40 @@ st.markdown('<p class="main-title">📊 DI 统计工具</p>', unsafe_allow_html=
 def aggrid_table(df: pd.DataFrame, columns: list, height: int = 300, page_size: int = 10):
     """
     使用 AgGrid 渲染可排序、分页、横向滚动的表格
-
-    Args:
-        df: DataFrame 数据
-        columns: 要显示的列
-        height: 表格高度
-        page_size: 默认每页条数
     """
     if not AGGRID_AVAILABLE:
-        st.dataframe(df[columns], hide_index=True, use_container_width=True, height=height)
+        st.dataframe(df[columns] if columns else df, hide_index=True, use_container_width=True, height=height)
         return
 
-    # 过滤存在的列
     display_cols = [c for c in columns if c in df.columns]
     if not display_cols:
         st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
 
-    gb = GridOptionsBuilder.from_dataframe(df[display_cols])
-    gb.configure_default_column(sortable=True, resizable=True, filterable=True)
-    gb.configurePagination(
+    gb = GridOptionsBuilder()
+    gb.configure_columns(display_cols, sortable=True, resizable=True, filterable=True)
+    gb.configure_default_column(sortable=True, resizable=True)
+
+    # 分页配置
+    gb.configure_pagination(
         paginationAutoPageSize=False,
         paginationPageSize=page_size,
         paginationPageSizeSelector=[10, 20, 50]
     )
-    gb.configure_side_bar(filters_panel=True)
-    gb.configure_column(
-        field="number",
-        headerName="问题单号",
-        cellRenderer="agTextRenderer",
-        url=True,
-        width=120
-    )
+
+    # 横向滚动
+    gb.configure_grid_options(domLayout='normal', width='auto', suppressColumnVirtualisation=False)
+
     grid_options = gb.build()
 
-    grid_response = AgGrid(
+    AgGrid(
         df[display_cols],
         gridOptions=grid_options,
-        update_mode=GridUpdateMode.MODEL_CHANGED,
         height=height,
-        fit_columns_on_grid_load=True,
-        allow_unsafe_jscode=True
+        fit_columns_on_grid_load=False,
+        allow_unsafe_jscode=True,
+        reload_data=False
     )
-    return grid_response
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
@@ -93,176 +109,223 @@ if "selected_version" not in st.session_state:
     st.session_state.selected_version = "全部"
 if "versions" not in st.session_state:
     st.session_state.versions = []
+if "sidebar_expanded" not in st.session_state:
+    st.session_state.sidebar_expanded = False
+
+
+# 侧边栏展开/折叠按钮
+col1, col2 = st.columns([1, 20])
+with col1:
+    if st.button("☰", help="展开/折叠侧边栏"):
+        st.session_state.sidebar_expanded = not st.session_state.sidebar_expanded
+        st.rerun()
 
 
 # 侧边栏
-st.sidebar.title("DI 统计工具")
-
-# API 导入（可折叠）
-with st.sidebar.expander("🔗 API 导入", expanded=True):
-    cookie = st.text_input("Cookie", type="password", help="登录 Cookie")
-    authorization = st.text_input("Authorization Token", type="password", help="JWT Token")
-    user_id = st.text_input("x-titan-userid", value="", help="用户 ID")
-    domain_input = st.text_input(
-        "Domain ID 列表",
-        value="11, 33921",
-        help="多个 Domain 用逗号分隔，如: 11, 33921"
-    )
-
-    if st.button("🔍 分析数据", type="primary", use_container_width=True):
-        if not cookie or not authorization or not user_id:
-            st.error("请填写完整的认证信息")
-        else:
-            with st.spinner("正在获取数据..."):
-                auth_config = {
-                    "cookie": cookie,
-                    "authorization": authorization,
-                    "x_titan_userid": user_id
-                }
-
-                try:
-                    domain_ids = [int(d.strip()) for d in domain_input.split(",") if d.strip()]
-                except ValueError:
-                    st.error("Domain ID 格式错误，请输入数字，用逗号分隔")
-                    domain_ids = []
-
-                if domain_ids:
-                    crawler = BugCrawler(auth_config, domain_ids=domain_ids)
-
-                    all_dfs = []
-                    for domain_id in domain_ids:
-                        print(f"\n========== 开始获取 Domain {domain_id} ==========")
-
-                        print(f"[Domain {domain_id}] 第1次导出: with_assigned_domain")
-                        data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
-                        df1 = load_excel(data1) if data1 else pd.DataFrame()
-                        print(f"[Domain {domain_id}] 第1次结果: bytes={len(data1) if data1 else 0}, df1行数={len(df1)}")
-
-                        print(f"[Domain {domain_id}] 第2次导出: without_assigned_domain")
-                        data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
-                        df2 = load_excel(data2) if data2 else pd.DataFrame()
-                        print(f"[Domain {domain_id}] 第2次结果: bytes={len(data2) if data2 else 0}, df2行数={len(df2)}")
-
-                        merged = merge_data(df1, df2)
-                        print(f"[Domain {domain_id}] 合并后总行数: {len(merged)}")
-
-                        if not merged.empty:
-                            merged["_source_domain"] = domain_id
-                            all_dfs.append(merged)
-
-                    if all_dfs:
-                        df_raw = pd.concat(all_dfs, ignore_index=True)
-                        df_raw = normalize_columns(df_raw)
-                        st.session_state.df_raw = df_raw
-                        st.session_state.versions = get_version_list(df_raw)
-                        st.session_state.selected_version = "全部"
-                        st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
-                    else:
-                        st.error("获取数据失败，请检查认证信息或 API 参数")
-
-# 导入 Excel（可折叠）
-with st.sidebar.expander("📁 导入 Excel", expanded=True):
-    uploaded_files = []
-    for i in range(3):
-        key = f"excel_file_{i}"
-        label = f"Excel 文件 {i+1}" + ("（必选）" if i == 0 else "（可选）")
-        uploaded = st.file_uploader(label, type=["xlsx"], key=key)
-        if uploaded:
-            uploaded_files.append(uploaded)
-
-    if st.button("📂 加载 Excel", type="primary", use_container_width=True):
-        if not uploaded_files:
-            st.error("请至少导入一个 Excel 文件")
-        else:
-            with st.spinner("正在加载 Excel..."):
-                try:
-                    all_dfs = []
-                    for f in uploaded_files:
-                        df = load_excel(f.getvalue())
-                        if not df.empty:
-                            all_dfs.append(df)
-                            print(f"Excel {f.name} 行数: {len(df)}")
-
-                    if all_dfs:
-                        merged = all_dfs[0]
-                        for i in range(1, len(all_dfs)):
-                            merged = merge_data(merged, all_dfs[i])
-                        print(f"合并后行数: {len(merged)}")
-
-                        if not merged.empty:
-                            merged = normalize_columns(merged)
-                            st.session_state.df_raw = merged
-                            st.session_state.versions = get_version_list(merged)
-                            st.session_state.selected_version = "全部"
-                            st.success(f"成功加载 {len(merged)} 条数据")
-                        else:
-                            st.error("Excel 数据为空")
-                    else:
-                        st.error("没有可加载的数据")
-                except Exception as e:
-                    st.error(f"加载失败: {e}")
-
-
-# 导出功能 - 改用抽屉式弹窗
-@st.dialog("导出问题单数据")
-def export_dialog():
-    """导出数据弹窗"""
-    st.write("### 导出条件筛选")
-
-    # 获取所有数据（经过 CCB 过滤）
-    df_all = filter_production_issues(st.session_state.df_raw)
-
-    # 版本过滤
-    version_options = ["全部"] + sorted(st.session_state.versions) if st.session_state.versions else ["全部"]
-    export_version = st.selectbox(
-        "选择发现问题版本",
-        options=version_options,
-        index=0,
-        help="筛选特定版本的问题单"
-    )
-
-    # 先按版本过滤
-    if export_version == "全部":
-        df_export = df_all.copy()
+with st.sidebar:
+    if not st.session_state.sidebar_expanded:
+        st.markdown("""
+        <style>
+            [data-testid="stSidebar"] { width: 0px !important; }
+            [data-testid="stSidebar"] * { display: none !important; }
+        </style>
+        """, unsafe_allow_html=True)
+        st.title("DI 统计工具")
+        if st.button("▶ 展开侧边栏"):
+            st.session_state.sidebar_expanded = True
+            st.rerun()
     else:
-        df_export = filter_by_version(df_all, export_version)
+        st.title("DI 统计工具")
 
-    # CES 微服务过滤
-    ces_list = df_export["assigned_to_domain"].dropna().unique()
-    ces_options = ["全部"] + sorted([str(ms) for ms in ces_list if is_microservice(ms)])
-    export_ms = st.selectbox(
-        "选择 CES 微服务",
-        options=ces_options,
-        index=0,
-        help="筛选特定微服务的问题单"
-    )
-
-    # 按微服务过滤
-    if export_ms != "全部":
-        df_export = df_export[df_export["assigned_to_domain"] == export_ms]
-
-    st.write(f"符合条件的问题单：**{len(df_export)}** 条")
-
-    if st.button("📥 下载 Excel", type="primary"):
-        if not df_export.empty:
-            # 导出时不需要中文列名，直接用原始英文列名保持和导入格式一致
-            excel_data = export_to_excel(df_export, "bug_export.xlsx")
-            st.download_button(
-                label="点击下载",
-                data=excel_data,
-                file_name=f"bug_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        # API 导入（默认折叠）
+        with st.expander("🔗 API 导入", expanded=False):
+            cookie = st.text_input("Cookie", type="password", help="登录 Cookie")
+            authorization = st.text_input("Authorization Token", type="password", help="JWT Token")
+            user_id = st.text_input("x-titan-userid", value="", help="用户 ID")
+            domain_input = st.text_input(
+                "Domain ID 列表",
+                value="11, 33921",
+                help="多个 Domain 用逗号分隔，如: 11, 33921"
             )
+
+            if st.button("🔍 分析数据", type="primary", use_container_width=True):
+                if not cookie or not authorization or not user_id:
+                    st.error("请填写完整的认证信息")
+                else:
+                    with st.spinner("正在获取数据..."):
+                        auth_config = {
+                            "cookie": cookie,
+                            "authorization": authorization,
+                            "x_titan_userid": user_id
+                        }
+
+                        try:
+                            domain_ids = [int(d.strip()) for d in domain_input.split(",") if d.strip()]
+                        except ValueError:
+                            st.error("Domain ID 格式错误，请输入数字，用逗号分隔")
+                            domain_ids = []
+
+                        if domain_ids:
+                            crawler = BugCrawler(auth_config, domain_ids=domain_ids)
+
+                            all_dfs = []
+                            for domain_id in domain_ids:
+                                print(f"\n========== 开始获取 Domain {domain_id} ==========")
+
+                                print(f"[Domain {domain_id}] 第1次导出: with_assigned_domain")
+                                data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
+                                df1 = load_excel(data1) if data1 else pd.DataFrame()
+                                print(f"[Domain {domain_id}] 第1次结果: bytes={len(data1) if data1 else 0}, df1行数={len(df1)}")
+
+                                print(f"[Domain {domain_id}] 第2次导出: without_assigned_domain")
+                                data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
+                                df2 = load_excel(data2) if data2 else pd.DataFrame()
+                                print(f"[Domain {domain_id}] 第2次结果: bytes={len(data2) if data2 else 0}, df2行数={len(df2)}")
+
+                                merged = merge_data(df1, df2)
+                                print(f"[Domain {domain_id}] 合并后总行数: {len(merged)}")
+
+                                if not merged.empty:
+                                    merged["_source_domain"] = domain_id
+                                    all_dfs.append(merged)
+
+                            if all_dfs:
+                                df_raw = pd.concat(all_dfs, ignore_index=True)
+                                df_raw = normalize_columns(df_raw)
+                                st.session_state.df_raw = df_raw
+                                st.session_state.versions = get_version_list(df_raw)
+                                st.session_state.selected_version = "全部"
+                                st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
+                            else:
+                                st.error("获取数据失败，请检查认证信息或 API 参数")
+
+        # 导入 Excel（默认折叠）
+        with st.expander("📁 导入 Excel", expanded=False):
+            uploaded_files = []
+            for i in range(3):
+                key = f"excel_file_{i}"
+                label = f"Excel 文件 {i+1}" + ("（必选）" if i == 0 else "（可选）")
+                uploaded = st.file_uploader(label, type=["xlsx"], key=key)
+                if uploaded:
+                    uploaded_files.append(uploaded)
+
+            if st.button("📂 加载 Excel", type="primary", use_container_width=True):
+                if not uploaded_files:
+                    st.error("请至少导入一个 Excel 文件")
+                else:
+                    with st.spinner("正在加载 Excel..."):
+                        try:
+                            all_dfs = []
+                            for f in uploaded_files:
+                                df = load_excel(f.getvalue())
+                                if not df.empty:
+                                    all_dfs.append(df)
+                                    print(f"Excel {f.name} 行数: {len(df)}")
+
+                            if all_dfs:
+                                merged = all_dfs[0]
+                                for i in range(1, len(all_dfs)):
+                                    merged = merge_data(merged, all_dfs[i])
+                                print(f"合并后行数: {len(merged)}")
+
+                                if not merged.empty:
+                                    merged = normalize_columns(merged)
+                                    st.session_state.df_raw = merged
+                                    st.session_state.versions = get_version_list(merged)
+                                    st.session_state.selected_version = "全部"
+                                    st.success(f"成功加载 {len(merged)} 条数据")
+                                else:
+                                    st.error("Excel 数据为空")
+                            else:
+                                st.error("没有可加载的数据")
+                        except Exception as e:
+                            st.error(f"加载失败: {e}")
+
+        # 导出按钮
+        st.divider()
+        if st.button("📥 导出版本有效DI-Excel", use_container_width=True, type="primary"):
+            if not st.session_state.df_raw.empty:
+                st.session_state.show_export_dialog = True
+            else:
+                st.warning("暂无数据")
+
+        if st.button("◀ 折叠侧边栏"):
+            st.session_state.sidebar_expanded = False
+            st.rerun()
+
+
+# 导出弹窗
+if st.session_state.get("show_export_dialog", False):
+    @st.dialog("导出问题单数据")
+    def export_dialog():
+        """导出数据弹窗"""
+        st.write("### 导出条件筛选")
+
+        # 获取所有数据（经过 CCB 过滤）
+        df_all = filter_production_issues(st.session_state.df_raw)
+
+        # 版本过滤
+        version_options = ["全部"] + sorted(st.session_state.versions) if st.session_state.versions else ["全部"]
+        export_version = st.selectbox(
+            "选择发现问题版本",
+            options=version_options,
+            index=0,
+            help="筛选特定版本的问题单"
+        )
+
+        # 先按版本过滤
+        if export_version == "全部":
+            df_export = df_all.copy()
         else:
-            st.warning("没有符合条件的数据")
+            df_export = filter_by_version(df_all, export_version)
 
+        # CES 微服务过滤
+        ces_list = df_export["assigned_to_domain"].dropna().unique()
+        ces_options = ["全部"] + sorted([str(ms) for ms in ces_list if is_microservice(ms)])
+        export_ms = st.selectbox(
+            "选择 CES 微服务",
+            options=ces_options,
+            index=0,
+            help="筛选特定微服务的问题单"
+        )
 
-# 导出按钮
-if st.sidebar.button("📥 导出 Excel", use_container_width=True):
-    if not st.session_state.df_raw.empty:
-        export_dialog()
-    else:
-        st.sidebar.warning("暂无数据")
+        # 按微服务过滤
+        if export_ms != "全部":
+            df_export = df_export[df_export["assigned_to_domain"] == export_ms]
+
+        # 按 DI 统计规则过滤
+        current_time = datetime.now()
+        from di_calculator import calculate_di_for_issue
+        df_export["_di"] = df_export.apply(lambda row: calculate_di_for_issue(row, current_time), axis=1)
+        df_export = df_export[df_export["_di"] > 0]
+        df_export = df_export.drop(columns=["_di"])
+
+        # 生成文件名
+        version_str = export_version if export_version != "全部" else "全部版本"
+        ms_str = export_ms if export_ms != "全部" else "全部微服务"
+        now = datetime.now()
+        filename = f"发现问题版本{version_str}-CES微服务{ms_str}-{now.strftime('%Y/%m/%d/%H/%M')}.xlsx"
+
+        st.write(f"符合条件的问题单：**{len(df_export)}** 条")
+
+        if st.button("📥 确认下载", type="primary"):
+            if not df_export.empty:
+                excel_data = export_to_excel(df_export, filename)
+                st.download_button(
+                    label="点击下载",
+                    data=excel_data,
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                st.warning("没有符合条件的数据")
+
+        if st.button("返回"):
+            st.session_state.show_export_dialog = False
+            st.rerun()
+
+    export_dialog()
+
 
 # 主页面
 if not st.session_state.df_raw.empty:
@@ -311,8 +374,8 @@ if not st.session_state.df_raw.empty:
     # 按版本过滤
     df_filtered = filter_by_version(df_all, st.session_state.selected_version)
 
-    # 计算微服务 DI
-    ms_di = calculate_microservice_di(df_filtered)
+    # 计算微服务 DI（包含按 DI 规则过滤后的问题单数）
+    ms_di = calculate_microservice_di_with_count(df_filtered)
 
     if not ms_di.empty:
         # 转换布尔值为文字
@@ -384,9 +447,9 @@ else:
     st.markdown("""
     ### 使用说明
 
-    1. 在侧边栏填写认证信息（Cookie、Authorization Token、x-titan-userid）
-    2. 点击「刷新数据」按钮获取问题单数据
+    1. 点击左上角 **☰** 按钮展开侧边栏
+    2. 在侧边栏选择 **API导入** 或 **导入Excel**
     3. 选择发现问题版本进行过滤
     4. 查看 CES 微服务 DI 统计
-    5. 点击「导出 Excel」下载筛选后的数据
+    5. 点击 **📥 导出版本有效DI-Excel** 下载筛选后的数据
     """)
