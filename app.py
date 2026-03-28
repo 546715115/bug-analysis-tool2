@@ -102,16 +102,22 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     if link_column and link_column in df.columns:
         from streamlit import column_config
 
-        # 构建 column_config 字典
+        # 构建 column_config 字典，设置固定列宽以支持横向滚动
         column_configs = {}
         for col in display_cols:
-            column_configs[col] = column_config.TextColumn(col)
+            # 根据列名设置合适的宽度
+            if "标题" in col:
+                column_configs[col] = column_config.TextColumn(col, width="large")
+            elif "单号" in col or "版本" in col:
+                column_configs[col] = column_config.TextColumn(col, width="medium")
+            else:
+                column_configs[col] = column_config.TextColumn(col, width="small")
 
         # 添加链接列，使用 LinkColumn
         df_display["问题详情链接"] = df[link_column].apply(
             lambda x: f"https://clouddevops.huawei.com/#/bug/{x}"
         )
-        column_configs["问题详情链接"] = column_config.LinkColumn("问题详情链接", display_text="查看详情")
+        column_configs["问题详情链接"] = column_config.LinkColumn("问题详情链接", display_text="查看详情", width="small")
 
         # 按选择的列排序 df_display
         final_cols = [c for c in display_cols if c in df_display.columns and c != "问题详情链接"]
@@ -128,14 +134,16 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     gb = GridOptionsBuilder.from_dataframe(df_display)
 
+    # 配置分页
     if pagination:
-        try:
-            gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=page_size)
-        except Exception:
-            pass
+        gb.configure_pagination(
+            paginationAutoPageSize=False,
+            paginationPageSize=page_size
+        )
 
     grid_options = gb.build()
 
+    # 分页设置
     if pagination:
         grid_options['pagination'] = True
         grid_options['paginationPageSize'] = page_size
@@ -145,17 +153,36 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         grid_options['pagination'] = False
         grid_options['suppressPaginationPanel'] = True
 
+    # 列宽自适应
+    grid_options['autoSizeColumns'] = True
+
     AgGrid(
         df_display,
         gridOptions=grid_options,
         height=height,
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
-        reload_data=False,
+        reload_data=True,
         enable_enterprise_modules=False,
         unsafe_allow_html=True,
         enableCellHtml=True
     )
+
+    # 添加CSS让表格内容和表头居中
+    st.markdown("""
+    <style>
+    .ag-cell {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    .ag-header-cell {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     # 添加CSS让表格内容和表头居中
     st.markdown("""
