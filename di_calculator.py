@@ -174,7 +174,11 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         # 其他情况 → 不统计
         return False, "生产-其他"
 
-    # 环境为空或其他未知情况，默认统计
+    # 环境为空或其他未知情况
+    # 已关闭状态，无论环境如何都不统计
+    if status == "已关闭":
+        return False, "环境未知-已关闭"
+    # 其他状态，环境未知时默认统计
     return True, "环境未知-统计"
 
 
