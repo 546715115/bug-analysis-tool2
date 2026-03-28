@@ -103,14 +103,17 @@ class BugCrawler:
                 verify=False
             )
 
-            if response.status_code != 200:
-                return None
-
+            print(f"[Domain {domain_id}] export 状态: {response.status_code}")
             data = response.json()
+            print(f"[Domain {domain_id}] export 响应: {data}")
+
             if data.get("code") == 200:
-                return data.get("data", {}).get("id")
+                file_id = data.get("data", {}).get("id")
+                print(f"[Domain {domain_id}] file_id: {file_id}")
+                return file_id
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[Domain {domain_id}] export 异常: {e}")
             return None
 
     def query_file_status(self, file_id: int) -> Optional[str]:
@@ -125,20 +128,24 @@ class BugCrawler:
                 timeout=30,
                 verify=False
             )
-            response.raise_for_status()
             data = response.json()
 
             if data.get("code") == 200:
                 result = data.get("data", {}).get("result", [])
                 if result:
-                    return result[0].get("status")
+                    status = result[0].get("status")
+                    print(f"[文件 {file_id}] 状态: {status}")
+                    return status
+            print(f"[文件 {file_id}] 查询失败: {data}")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[文件 {file_id}] 查询异常: {e}")
             return None
 
     def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
         """下载 Excel 文件"""
         url = f"{self.base_url}/vision-excel/api/download/workitem?id={file_id}"
+        print(f"[文件 {file_id}] 下载 URL: {url}")
         try:
             response = self.session.get(
                 url,
@@ -146,10 +153,13 @@ class BugCrawler:
                 timeout=60,
                 verify=False
             )
+            print(f"[文件 {file_id}] 状态码: {response.status_code}, 大小: {len(response.content)}")
             if response.status_code == 200 and not response.content.startswith(b'<'):
                 return response.content
+            print(f"[文件 {file_id}] 响应前100字节: {response.content[:100]}")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[文件 {file_id}] 异常: {e}")
             return None
 
     def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
