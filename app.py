@@ -76,25 +76,20 @@ if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=Tr
                     print(f"\n========== 开始获取 Domain {domain_id} ==========")
 
                     # 获取两种条件的数据并合并
+                    print(f"[Domain {domain_id}] ===== 开始获取数据 =====")
+
+                    print(f"[Domain {domain_id}] 第1次导出: with_assigned_domain")
                     data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
-                    print(f"[Domain {domain_id}] with_assigned_domain data1: {len(data1) if data1 else 0} bytes")
+                    df1 = load_excel(data1) if data1 else pd.DataFrame()
+                    print(f"[Domain {domain_id}] 第1次结果: bytes={len(data1) if data1 else 0}, df1行数={len(df1)}")
 
-                    if data1:
-                        df1 = load_excel(data1)
-                        print(f"[Domain {domain_id}] df1 行数: {len(df1)}")
-                    else:
-                        df1 = pd.DataFrame()
-
+                    print(f"[Domain {domain_id}] 第2次导出: without_assigned_domain")
                     data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
-                    print(f"[Domain {domain_id}] without_assigned_domain data2: {len(data2) if data2 else 0} bytes")
-
-                    if data2:
-                        df2 = load_excel(data2)
-                        print(f"[Domain {domain_id}] df2 行数: {len(df2)}")
-                    else:
-                        df2 = pd.DataFrame()
+                    df2 = load_excel(data2) if data2 else pd.DataFrame()
+                    print(f"[Domain {domain_id}] 第2次结果: bytes={len(data2) if data2 else 0}, df2行数={len(df2)}")
 
                     merged = merge_data(df1, df2)
+                    print(f"[Domain {domain_id}] 合并后总行数: {len(merged)}")
                     print(f"[Domain {domain_id}] 合并后行数: {len(merged)}")
 
                     if not merged.empty:

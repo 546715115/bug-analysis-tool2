@@ -97,12 +97,17 @@ class BugCrawler:
             config_url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
             try:
                 self.session.get(config_url, headers=self._get_headers(), timeout=30, verify=False)
+                print(f"[Domain {domain_id}] GET download_item 完成")
             except Exception:
                 pass
             self._export_initialized = True
 
         url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
         payload = self.build_export_payload(domain_id, source_type)
+
+        # 打印关键参数
+        has_assigned = "assigned_domain" in payload.get("conditions", {})
+        print(f"[Domain {domain_id}] 导出请求: source_type={source_type}, has_assigned_domain={has_assigned}")
 
         try:
             response = self.session.post(
@@ -114,13 +119,18 @@ class BugCrawler:
             )
 
             if response.status_code != 200:
+                print(f"[Domain {domain_id}] export 失败: HTTP {response.status_code}")
                 return None
 
             data = response.json()
             if data.get("code") == 200:
-                return data.get("data", {}).get("id")
+                file_id = data.get("data", {}).get("id")
+                print(f"[Domain {domain_id}] export 成功: file_id={file_id}")
+                return file_id
+            print(f"[Domain {domain_id}] export 失败: {data}")
             return None
-        except Exception:
+        except Exception as e:
+            print(f"[Domain {domain_id}] export 异常: {e}")
             return None
 
     def query_file_status(self, file_id: int) -> Optional[str]:
