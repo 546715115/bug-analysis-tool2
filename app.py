@@ -73,6 +73,27 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     )
 
 
+# 英文到中文的列名映射（用于导出，保持与导入格式一致）
+EN_TO_CN_MAPPING = {
+    "number": "问题单号",
+    "title": "标题",
+    "severity_level": "严重程度",
+    "status": "问题状态",
+    "stage": "问题阶段",
+    "assigned_to_domain": "责任服务",
+    "from_version": "发现问题版本",
+    "discover_iteration": "发现迭代",
+    "created_time": "创建时间",
+    "delivery_scenario": "交付场景",
+    "valid": "挂起/撤销",
+    "discovered_environment": "发现环境",
+    "labels": "标签",
+    "dev_person": "研发责任人",
+    "testOwners": "测试责任人",
+    "discovered_time": "发现时间"
+}
+
+
 def filter_by_di_rules(df: pd.DataFrame) -> pd.DataFrame:
     """
     按 DI 统计规则过滤问题单
@@ -91,10 +112,24 @@ def filter_by_di_rules(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
-    """导出 DataFrame 为 Excel 文件，带表头筛选功能"""
+    """导出 DataFrame 为 Excel 文件，带表头筛选功能，列名转中文"""
     output = BytesIO()
+
+    # 复制数据，避免修改原 DataFrame
+    df_export = df.copy()
+
+    # 将英文列名转成中文（与导入格式一致）
+    # 如果列名已经是中文则不转换
+    rename_map = {}
+    for col in df_export.columns:
+        if col in EN_TO_CN_MAPPING:
+            rename_map[col] = EN_TO_CN_MAPPING[col]
+        # 如果列名是中文但不在映射中（如 API 导入返回中文列名），保留原名
+
+    df_export = df_export.rename(columns=rename_map)
+
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='问题单明细')
+        df_export.to_excel(writer, index=False, sheet_name='问题单明细')
         worksheet = writer.sheets['问题单明细']
         worksheet.auto_filter.ref = worksheet.dimensions
     output.seek(0)
@@ -241,19 +276,6 @@ def render_sidebar():
     if st.button("◀ 折叠侧边栏"):
         st.session_state.sidebar_expanded = False
         st.rerun()
-
-
-# 根据侧边栏状态选择布局
-if st.session_state.sidebar_expanded:
-    # 侧边栏展开：左侧窄栏 + 右侧主内容
-    with st.sidebar:
-        render_sidebar()
-
-    # 主页面内容
-    main_content()
-else:
-    # 侧边栏折叠：只显示主页面内容
-    main_content()
 
 
 def main_content():
@@ -467,3 +489,14 @@ def main_content():
         4. 查看 CES 微服务 DI 统计
         5. 点击 **📥 导出版本有效DI-Excel** 下载筛选后的数据
         """)
+
+
+# 根据侧边栏状态选择布局
+if st.session_state.sidebar_expanded:
+    # 侧边栏展开：渲染侧边栏内容
+    with st.sidebar:
+        render_sidebar()
+
+# 主页面内容（始终渲染）
+main_content()
+
