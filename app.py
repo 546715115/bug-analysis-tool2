@@ -44,10 +44,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         table_key: 表格唯一标识，用于区分不同表格的列选择状态
         pagination: 是否启用分页，False则显示所有行
     """
-    if not AGGRID_AVAILABLE:
-        st.dataframe(df[columns] if columns else df, hide_index=True, use_container_width=True, height=height)
-        return
-
     if columns is None:
         columns = list(df.columns)
 
@@ -69,17 +65,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         col_left, col_right = st.columns([1, 1])
         with col_left:
             with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
-                # 使用 session_state_dict 存储每个字段的选中状态
                 if list_key not in st.session_state:
                     st.session_state[list_key] = display_cols.copy()
                 if dict_key not in st.session_state:
-                    # 初始化：默认选中的字段标记为True，其他为False
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
 
                 with st.form(key=f"form_{session_key}"):
                     st.markdown("**选择展示字段**")
                     st.markdown("---")
-                    # 按从左到右顺序显示所有可选列（所有字段都展示）
                     for col in all_columns:
                         is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
                         st.session_state[dict_key][col] = is_checked
@@ -91,16 +84,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        # 根据字典更新列表（选中且在df.columns中的字段）
                         new_list = [col for col in all_columns if st.session_state[dict_key].get(col, False)]
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
-                        # 恢复默认：默认选中的字段
                         st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
                         st.rerun()
 
-        # 使用用户选择的列
         display_cols = [c for c in st.session_state[list_key] if c in df.columns]
         if not display_cols:
             st.warning("请至少选择一个展示字段")
@@ -108,23 +98,39 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     df_display = df[display_cols].copy()
 
-    # 如果有链接列，在最后添加"查看详情"按钮列
+    # 如果有链接列，使用 st.dataframe + column_config.LinkColumn 实现可点击链接
     if link_column and link_column in df.columns:
-        # 生成HTML格式的查看详情链接
-        df_display["问题详情链接"] = df[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><button style="background-color:#1E3A8A;color:white;border:none;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;">查看详情</button></a>'
-        )
+        from streamlit import column_config
 
-    # 使用 from_dataframe 方式构建
+        # 构建 column_config 字典
+        column_configs = {}
+        for col in display_cols:
+            column_configs[col] = column_config.TextColumn(col, width="medium")
+
+        # 添加链接列，使用 LinkColumn
+        df_display["问题详情链接"] = df[link_column].apply(
+            lambda x: f"https://clouddevops.huawei.com/#/bug/{x}"
+        )
+        column_configs["问题详情链接"] = column_config.LinkColumn("问题详情链接", display_text="查看详情", width="small")
+
+        # 按选择的列排序 df_display
+        final_cols = [c for c in display_cols if c in df_display.columns and c != "问题详情链接"]
+        final_cols.append("问题详情链接")
+        df_display = df_display[final_cols]
+
+        st.dataframe(df_display, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
+        return
+
+    # 没有链接列，使用 AgGrid
+    if not AGGRID_AVAILABLE:
+        st.dataframe(df_display, hide_index=True, use_container_width=True, height=height)
+        return
+
     gb = GridOptionsBuilder.from_dataframe(df_display)
 
-    # 分页配置
     if pagination:
         try:
-            gb.configure_pagination(
-                paginationAutoPageSize=False,
-                paginationPageSize=page_size
-            )
+            gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=page_size)
         except Exception:
             pass
 
