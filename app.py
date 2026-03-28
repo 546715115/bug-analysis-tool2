@@ -29,133 +29,112 @@ if "selected_version" not in st.session_state:
 if "versions" not in st.session_state:
     st.session_state.versions = []
 
-# 侧边栏 - 认证配置
-st.sidebar.title("认证配置")
+# 侧边栏
+st.sidebar.title("DI 统计工具")
 
-cookie = st.sidebar.text_input("Cookie", type="password", help="登录 Cookie")
-authorization = st.sidebar.text_input("Authorization Token", type="password", help="JWT Token")
-user_id = st.sidebar.text_input("x-titan-userid", value="", help="用户 ID")
+# API 导入（可折叠）
+with st.sidebar.expander("🔗 API 导入", expanded=True):
+    cookie = st.text_input("Cookie", type="password", help="登录 Cookie")
+    authorization = st.text_input("Authorization Token", type="password", help="JWT Token")
+    user_id = st.text_input("x-titan-userid", value="", help="用户 ID")
+    domain_input = st.text_input(
+        "Domain ID 列表",
+        value="11, 33921",
+        help="多个 Domain 用逗号分隔，如: 11, 33921"
+    )
 
-st.sidebar.divider()
+    if st.button("🔍 分析数据", type="primary", use_container_width=True):
+        if not cookie or not authorization or not user_id:
+            st.error("请填写完整的认证信息")
+        else:
+            with st.spinner("正在获取数据..."):
+                auth_config = {
+                    "cookie": cookie,
+                    "authorization": authorization,
+                    "x_titan_userid": user_id
+                }
 
-# Excel 导入功能
-st.sidebar.subheader("📁 Excel 导入")
-uploaded_file1 = st.sidebar.file_uploader("导入 Excel 文件 1", type=["xlsx"], key="file1")
-uploaded_file2 = st.sidebar.file_uploader("导入 Excel 文件 2（可选）", type=["xlsx"], key="file2")
+                try:
+                    domain_ids = [int(d.strip()) for d in domain_input.split(",") if d.strip()]
+                except ValueError:
+                    st.error("Domain ID 格式错误，请输入数字，用逗号分隔")
+                    domain_ids = []
 
-if st.sidebar.button("📂 加载导入的 Excel", type="primary", use_container_width=True):
-    if not uploaded_file1:
-        st.sidebar.error("请至少导入一个 Excel 文件")
-    else:
-        with st.spinner("正在加载 Excel..."):
-            from io import BytesIO
-            try:
-                df1 = load_excel(uploaded_file1.getvalue())
-                print(f"Excel 1 行数: {len(df1)}")
+                if domain_ids:
+                    crawler = BugCrawler(auth_config, domain_ids=domain_ids)
 
-                if uploaded_file2:
-                    df2 = load_excel(uploaded_file2.getvalue())
-                    print(f"Excel 2 行数: {len(df2)}")
-                else:
-                    df2 = pd.DataFrame()
+                    all_dfs = []
+                    for domain_id in domain_ids:
+                        print(f"\n========== 开始获取 Domain {domain_id} ==========")
 
-                merged = merge_data(df1, df2)
-                print(f"合并后行数: {len(merged)}")
+                        print(f"[Domain {domain_id}] 第1次导出: with_assigned_domain")
+                        data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
+                        df1 = load_excel(data1) if data1 else pd.DataFrame()
+                        print(f"[Domain {domain_id}] 第1次结果: bytes={len(data1) if data1 else 0}, df1行数={len(df1)}")
 
-                if not merged.empty:
-                    merged = normalize_columns(merged)
-                    st.session_state.df_raw = merged
-                    st.session_state.versions = get_version_list(merged)
-                    st.session_state.selected_version = "全部"
-                    st.sidebar.success(f"成功加载 {len(merged)} 条数据")
-                else:
-                    st.sidebar.error("Excel 数据为空")
-            except Exception as e:
-                st.sidebar.error(f"加载失败: {e}")
+                        print(f"[Domain {domain_id}] 第2次导出: without_assigned_domain")
+                        data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
+                        df2 = load_excel(data2) if data2 else pd.DataFrame()
+                        print(f"[Domain {domain_id}] 第2次结果: bytes={len(data2) if data2 else 0}, df2行数={len(df2)}")
 
-st.sidebar.divider()
+                        merged = merge_data(df1, df2)
+                        print(f"[Domain {domain_id}] 合并后总行数: {len(merged)}")
 
-# Domain 配置
-st.sidebar.subheader("Domain 配置")
-domain_input = st.sidebar.text_input(
-    "Domain ID 列表",
-    value="11, 33921",
-    help="多个 Domain 用逗号分隔，如: 11, 33921"
-)
+                        if not merged.empty:
+                            merged["_source_domain"] = domain_id
+                            all_dfs.append(merged)
 
-st.sidebar.divider()
-
-if st.sidebar.button("🔄 刷新数据", type="primary", use_container_width=True):
-    if not cookie or not authorization or not user_id:
-        st.sidebar.error("请填写完整的认证信息")
-    else:
-        with st.spinner("正在获取数据..."):
-            auth_config = {
-                "cookie": cookie,
-                "authorization": authorization,
-                "x_titan_userid": user_id
-            }
-
-            # 解析 domain IDs
-            try:
-                domain_ids = [int(d.strip()) for d in domain_input.split(",") if d.strip()]
-            except ValueError:
-                st.sidebar.error("Domain ID 格式错误，请输入数字，用逗号分隔")
-                domain_ids = []
-
-            if domain_ids:
-                crawler = BugCrawler(auth_config, domain_ids=domain_ids)
-
-                # 获取所有 domain 的数据
-                all_dfs = []
-                for domain_id in domain_ids:
-                    st.sidebar.info(f"正在获取 Domain {domain_id}...")
-                    print(f"\n========== 开始获取 Domain {domain_id} ==========")
-
-                    # 获取两种条件的数据并合并
-                    print(f"[Domain {domain_id}] ===== 开始获取数据 =====")
-
-                    print(f"[Domain {domain_id}] 第1次导出: with_assigned_domain")
-                    data1 = crawler.fetch_data(domain_id, "with_assigned_domain")
-                    df1 = load_excel(data1) if data1 else pd.DataFrame()
-                    print(f"[Domain {domain_id}] 第1次结果: bytes={len(data1) if data1 else 0}, df1行数={len(df1)}")
-
-                    print(f"[Domain {domain_id}] 第2次导出: without_assigned_domain")
-                    data2 = crawler.fetch_data(domain_id, "without_assigned_domain")
-                    df2 = load_excel(data2) if data2 else pd.DataFrame()
-                    print(f"[Domain {domain_id}] 第2次结果: bytes={len(data2) if data2 else 0}, df2行数={len(df2)}")
-
-                    merged = merge_data(df1, df2)
-                    print(f"[Domain {domain_id}] 合并后总行数: {len(merged)}")
-                    print(f"[Domain {domain_id}] 合并后行数: {len(merged)}")
-
-                    if not merged.empty:
-                        merged["_source_domain"] = domain_id  # 标记数据来源
-                        all_dfs.append(merged)
-                        print(f"[Domain {domain_id}] 添加到结果集")
+                    if all_dfs:
+                        df_raw = pd.concat(all_dfs, ignore_index=True)
+                        df_raw = normalize_columns(df_raw)
+                        st.session_state.df_raw = df_raw
+                        st.session_state.versions = get_version_list(df_raw)
+                        st.session_state.selected_version = "全部"
+                        st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
                     else:
-                        print(f"[Domain {domain_id}] 警告: 数据为空")
+                        st.error("获取数据失败，请检查认证信息或 API 参数")
 
-                if all_dfs:
-                    df_raw = pd.concat(all_dfs, ignore_index=True)
-                    print(f"\n所有 Domain 合并后总行数: {len(df_raw)}")
+# 导入 Excel（可折叠）
+with st.sidebar.expander("📁 导入 Excel", expanded=True):
+    uploaded_files = []
+    for i in range(3):
+        key = f"excel_file_{i}"
+        label = f"Excel 文件 {i+1}" + ("（必选）" if i == 0 else "（可选）")
+        uploaded = st.file_uploader(label, type=["xlsx"], key=key)
+        if uploaded:
+            uploaded_files.append(uploaded)
 
-                    df_raw = normalize_columns(df_raw)
-                    print(f"标准化列名后列名: {list(df_raw.columns)}")
+    if st.button("📂 加载 Excel", type="primary", use_container_width=True):
+        if not uploaded_files:
+            st.error("请至少导入一个 Excel 文件")
+        else:
+            with st.spinner("正在加载 Excel..."):
+                try:
+                    all_dfs = []
+                    for f in uploaded_files:
+                        df = load_excel(f.getvalue())
+                        if not df.empty:
+                            all_dfs.append(df)
+                            print(f"Excel {f.name} 行数: {len(df)}")
 
-                    st.session_state.df_raw = df_raw
+                    if all_dfs:
+                        merged = all_dfs[0]
+                        for i in range(1, len(all_dfs)):
+                            merged = merge_data(merged, all_dfs[i])
+                        print(f"合并后行数: {len(merged)}")
 
-                    # 获取版本列表
-                    st.session_state.versions = get_version_list(df_raw)
-                    print(f"发现版本列表: {st.session_state.versions}")
-                    st.session_state.selected_version = "全部"
-
-                    st.sidebar.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
-                else:
-                    print("错误: 所有 Domain 数据都为空")
-                    st.sidebar.error("获取数据失败，请检查认证信息")
-
-st.sidebar.divider()
+                        if not merged.empty:
+                            merged = normalize_columns(merged)
+                            st.session_state.df_raw = merged
+                            st.session_state.versions = get_version_list(merged)
+                            st.session_state.selected_version = "全部"
+                            st.success(f"成功加载 {len(merged)} 条数据")
+                        else:
+                            st.error("Excel 数据为空")
+                    else:
+                        st.error("没有可加载的数据")
+                except Exception as e:
+                    st.error(f"加载失败: {e}")
 
 # 导出功能
 st.sidebar.subheader("导出功能")
