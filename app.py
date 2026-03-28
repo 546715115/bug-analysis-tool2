@@ -175,8 +175,18 @@ if "selected_version" not in st.session_state:
     st.session_state.selected_version = "全部"
 if "versions" not in st.session_state:
     st.session_state.versions = []
-# 侧边栏默认展开，移除复杂切换逻辑
-# Streamlit sidebar本身就是可折叠的，用户可以使用侧边栏自身的折叠功能
+# 侧边栏状态：导入成功后折叠
+if "sidebar_collapsed" not in st.session_state:
+    st.session_state.sidebar_collapsed = False
+
+# 如果侧边栏已折叠，添加CSS隐藏
+if st.session_state.sidebar_collapsed:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] {display: none !important;}
+    [data-testid="stMainBlockContainer"] {width: 100% !important;}
+    </style>
+    """, unsafe_allow_html=True)
 
 
 def render_sidebar():
@@ -241,6 +251,7 @@ def render_sidebar():
                             st.session_state.df_raw = df_raw
                             st.session_state.versions = get_version_list(df_raw)
                             st.session_state.selected_version = "全部"
+                            st.session_state.sidebar_collapsed = True
                             st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
                         else:
                             st.error("获取数据失败，请检查认证信息或 API 参数")
@@ -279,6 +290,7 @@ def render_sidebar():
                                 st.session_state.df_raw = merged
                                 st.session_state.versions = get_version_list(merged)
                                 st.session_state.selected_version = "全部"
+                                st.session_state.sidebar_collapsed = True
                                 st.success(f"成功加载 {len(merged)} 条数据")
                             else:
                                 st.error("Excel 数据为空")
