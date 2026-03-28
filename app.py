@@ -63,10 +63,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     if session_key not in st.session_state:
         st.session_state[session_key] = display_cols.copy()
 
-    # 如果有可选列配置，添加⚙️按钮（右上角）
+    # 如果有可选列配置，添加⚙️按钮
     if all_columns:
-        col_left, col_right = st.columns([5, 1])
-        with col_right:
+        col_left, col_right = st.columns([1, 1])
+        with col_left:
             with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
                 # 使用 session_state_dict 存储每个字段的选中状态
                 if list_key not in st.session_state:
@@ -110,7 +110,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     if link_column and link_column in df.columns:
         # 使用 markdown 链接实现按钮效果
         df_display["问题详情链接"] = df[link_column].apply(
-            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank" style="display: inline-block; background-color: #1E3A8A; color: white; padding: 6px 12px; text-decoration: none; border-radius: 6px; font-size: 12px; text-align: center;">查看详情</a>'
+            lambda x: f'<a href="https://clouddevops.huawei.com/#/bug/{x}" target="_blank"><span style="display:inline-block;background-color:#1E3A8A;color:white;padding:4px 10px;border-radius:4px;font-size:12px;text-decoration:none;">查看详情</span></a>'
         )
 
     # 使用 from_dataframe 方式构建
@@ -132,11 +132,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     grid_options['paginationPageSize'] = page_size
     grid_options['suppressPaginationPanel'] = False
 
+    # 配置列宽自适应
+    grid_options['autoSizeColumns'] = True
+
     AgGrid(
         df_display,
         gridOptions=grid_options,
         height=height,
-        fit_columns_on_grid_load=False,
+        fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         reload_data=False,
         enable_enterprise_modules=False,
