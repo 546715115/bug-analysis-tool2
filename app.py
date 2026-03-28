@@ -465,7 +465,8 @@ def main_content():
                     st.markdown("**SLA 阈值（天）**")
                     st.markdown("致命：7 天")
                     st.markdown("严重：14 天")
-                    st.markdown("一般/提示：30 天")
+                    st.markdown("一般：30 天")
+                    st.markdown("提示：30 天")
                 with col_right:
                     st.markdown("**DI 权重**")
                     st.markdown("致命：10")
@@ -473,30 +474,32 @@ def main_content():
                     st.markdown("一般：1")
                     st.markdown("提示：0.1")
                 st.markdown("")
-                # 生产环境和非生产环境规则左右排列
-                col_prod, col_nonprod = st.columns(2)
-                with col_prod:
-                    st.markdown("**生产环境 DI**")
-                    st.markdown("| 状态 | 阶段 | 统计? |")
-                    st.markdown("|------|------|--------|")
-                    st.markdown("| 待验收 | 空 | ❌ |")
-                    st.markdown("| 已关闭 | 空 | ❌ |")
-                    st.markdown("| 修复 | 修复完成 | ❌ |")
-                    st.markdown("| 待确认 | 空 | ✅ |")
-                    st.markdown("| 待修复 | 空 | ✅ |")
-                    st.markdown("| 修复 | 修复中 | ✅ |")
-                    st.markdown("| 修复 | 修复测试 | ✅ |")
-                with col_nonprod:
-                    st.markdown("**非生产环境 DI**")
-                    st.markdown("| 状态 | 阶段 | 统计? |")
-                    st.markdown("|------|------|--------|")
-                    st.markdown("| 待提交 | 空 | ❌ |")
-                    st.markdown("| 已关闭 | 空 | ❌ |")
-                    st.markdown("| 待确认 | 空 | ✅ |")
-                    st.markdown("| 待修复 | 空 | ✅ |")
-                    st.markdown("| 修复 | 修复中 | ✅ |")
-                    st.markdown("| 修复 | 修复测试 | ✅ |")
-                    st.markdown("| 修复 | 修复完成 | ✅ |")
+                # 生产环境和非生产环境规则表格
+                st.markdown("**DI 统计规则**")
+                table_html = """
+                <table style='width:100%; border-collapse: collapse; font-size: 0.85em;'>
+                <thead>
+                <tr style='background-color: #f0f0f0;'>
+                    <th style='padding: 8px; border: 1px solid #ddd; text-align: left;'>问题单状态</th>
+                    <th style='padding: 8px; border: 1px solid #ddd; text-align: center;'>生产环境DI</th>
+                    <th style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产环境DI</th>
+                    <th style='padding: 8px; border: 1px solid #ddd; text-align: center;'>备注</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>待提交/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>/</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>待确认/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>/</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>定位中/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>/</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>待修复/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产按SLA超期计算</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>待验收/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产按SLA超期计算</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>修复/修复中</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产按SLA超期计算</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>修复/修复测试</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产按SLA超期计算</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>修复/修复完成</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>非生产按SLA超期计算</td></tr>
+                <tr><td style='padding: 8px; border: 1px solid #ddd;'>已关闭/空</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>不统计</td><td style='padding: 8px; border: 1px solid #ddd; text-align: center;'>/</td></tr>
+                </tbody>
+                </table>
+                """
+                st.markdown(table_html, unsafe_allow_html=True)
 
         st.divider()
 
