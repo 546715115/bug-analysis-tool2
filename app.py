@@ -215,18 +215,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         'alignItems': 'center'
     }
 
-    # 为每个列配置居中样式和固定宽度
-    col_width = "auto"
+    # 为每个列配置居中样式和自适应宽度
     for col in df_display.columns:
-        if "名称" in col or "标题" in col:
-            col_width = 200
-        elif "单号" in col or "版本" in col:
-            col_width = 120
-        elif "DI" in col or "值" in col:
-            col_width = 80
-        else:
-            col_width = 100
-        gb.configure_column(col, headerCellStyle=header_cell_style, cellStyle=cell_style, width=col_width, minWidth=col_width)
+        gb.configure_column(col, headerCellStyle=header_cell_style, cellStyle=cell_style, flex=1, minWidth=80)
 
     grid_options = gb.build()
 
