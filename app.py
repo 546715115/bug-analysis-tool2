@@ -75,17 +75,24 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                 # 初始化当前选中的列列表（从session恢复或使用默认）
                 if list_key not in st.session_state:
                     st.session_state[list_key] = display_cols.copy()
+
+                # 用于强制刷新checkbox的版本号
+                cb_version_key = f"{session_key}_cb_version"
+                if cb_version_key not in st.session_state:
+                    st.session_state[cb_version_key] = 0
+
                 current_selected = st.session_state[list_key]
 
                 with st.form(key=f"form_{session_key}"):
                     st.markdown("**选择展示字段**")
                     st.markdown("---")
 
-                    # 渲染checkbox，直接使用current_selected来确定是否选中
+                    # 渲染checkbox，使用带版本的key避免状态缓存问题
                     new_selected = []
+                    cb_version = st.session_state[cb_version_key]
                     for col in all_columns:
                         checked = col in current_selected
-                        if st.checkbox(col, value=checked, key=f"cb_{session_key}_{col}"):
+                        if st.checkbox(col, value=checked, key=f"cb_{session_key}_{col}_v{cb_version}"):
                             new_selected.append(col)
 
                     col1, col2 = st.columns(2)
@@ -99,6 +106,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         st.rerun()
                     if reset:
                         st.session_state[list_key] = st.session_state[default_cols_key].copy()
+                        st.session_state[cb_version_key] = cb_version + 1  # 递增版本号，强制刷新checkbox
                         st.rerun()
 
         display_cols = [c for c in st.session_state[list_key] if c in df.columns]
@@ -161,20 +169,22 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
             current_page = st.session_state.get(f"{table_key}_page", 1)
-            # 使用自定义按钮实现紧凑分页
-            col_prev, col_page, col_next = st.columns([1, 2, 1])
-            with col_prev:
-                if st.button("◀", key=f"{table_key}_prev", use_container_width=True):
-                    if current_page > 1:
-                        st.session_state[f"{table_key}_page"] = current_page - 1
-                        st.rerun()
-            with col_page:
-                st.write(f"第 {current_page} / {total_pages} 页 (共 {total_rows} 条)")
-            with col_next:
-                if st.button("▶", key=f"{table_key}_next", use_container_width=True):
-                    if current_page < total_pages:
-                        st.session_state[f"{table_key}_page"] = current_page + 1
-                        st.rerun()
+            # 使用自定义按钮实现紧凑分页，1/4宽度
+            col_left, col_center, col_right = st.columns([3, 1, 3])
+            with col_center:
+                col_prev, col_page, col_next = st.columns([1, 2, 1])
+                with col_prev:
+                    if st.button("◀", key=f"{table_key}_prev", use_container_width=True):
+                        if current_page > 1:
+                            st.session_state[f"{table_key}_page"] = current_page - 1
+                            st.rerun()
+                with col_page:
+                    st.write(f"第 {current_page} / {total_pages} 页")
+                with col_next:
+                    if st.button("▶", key=f"{table_key}_next", use_container_width=True):
+                        if current_page < total_pages:
+                            st.session_state[f"{table_key}_page"] = current_page + 1
+                            st.rerun()
         return
 
     # 没有链接列，使用 AgGrid
