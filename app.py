@@ -748,7 +748,7 @@ def main_content():
         # 问题单明细可选字段
         issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
         if cols_to_show:
-            aggrid_table(df_display[cols_to_show], cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
+            aggrid_table(df_display, cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
