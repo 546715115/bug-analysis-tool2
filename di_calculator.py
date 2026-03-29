@@ -84,7 +84,7 @@ def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
         (result.get("discovered_environment") == "非生产环境") &
         (result.get("valid") == "挂起")
     )
-    result = result[~mask]
+    result = result.loc[~mask]
 
     return result
 
