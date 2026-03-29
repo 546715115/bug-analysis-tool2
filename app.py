@@ -164,14 +164,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         # 渲染表格
         st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
 
-        # 分页选择器 - 置于表格下方，右侧与表格对齐
+        # 分页选择器 - 置于表格下方，右对齐
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
             current_page = st.session_state.get(f"{table_key}_page", 1)
-            # 使用自定义按钮实现紧凑分页，1/4宽度
-            col_left, col_center, col_right = st.columns([3, 1, 3])
-            with col_center:
+            # 使用自定义按钮实现紧凑分页，放在右下方
+            col_left, col_pagination = st.columns([7, 1])
+            with col_pagination:
                 col_prev, col_page, col_next = st.columns([1, 2, 1])
                 with col_prev:
                     if st.button("◀", key=f"{table_key}_prev", use_container_width=True):
@@ -179,7 +179,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                             st.session_state[f"{table_key}_page"] = current_page - 1
                             st.rerun()
                 with col_page:
-                    st.write(f"第 {current_page} / {total_pages} 页")
+                    st.write(f"第 {current_page}/{total_pages}")
                 with col_next:
                     if st.button("▶", key=f"{table_key}_next", use_container_width=True):
                         if current_page < total_pages:
