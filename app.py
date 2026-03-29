@@ -201,10 +201,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             paginationPageSize=page_size
         )
 
-    # 默认列居中
-    gb.configure_default_column(
-        cellStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
-    )
+    # 为每个列配置居中样式（表头和数据都居中）
+    for col in df_display.columns:
+        gb.configure_column(
+            col,
+            headerStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'},
+            cellStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
+        )
 
     grid_options = gb.build()
 
@@ -221,17 +224,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     # 列宽自适应
     grid_options['autoSizeColumns'] = True
 
-    # 自定义CSS居中
-    custom_css = {
-        ".ag-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"},
-        ".ag-header-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"}
-    }
-
     AgGrid(
         df_display,
         gridOptions=grid_options,
         height=height,
-        custom_css=custom_css,
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         reload_data=True,
