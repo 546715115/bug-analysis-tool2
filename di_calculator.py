@@ -79,10 +79,14 @@ def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
 
     result = df.copy()
 
+    # 如果必要列不存在，直接返回不过滤
+    if "discovered_environment" not in result.columns or "valid" not in result.columns:
+        return result
+
     # 非生产环境且挂起/撤销的问题单剔除
     mask = (
-        (result.get("discovered_environment") == "非生产环境") &
-        (result.get("valid") == "挂起")
+        (result["discovered_environment"] == "非生产环境") &
+        (result["valid"] == "挂起")
     )
     result = result.loc[~mask]
 
