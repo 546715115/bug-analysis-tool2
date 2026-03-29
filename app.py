@@ -151,14 +151,15 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         # 渲染表格
         st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
 
-        # 分页选择器 - 置于表格下方，宽度与⚙️按钮对齐
+        # 分页选择器 - 置于表格下方，1/4宽度，右侧与表格对齐
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
-            col1, col2, col3 = st.columns([1, 2, 6])
+            # 使用columns使分页器1/4宽度，右侧与表格对齐
+            col1, col2 = st.columns([3, 1])
             with col2:
                 new_page = st.number_input(
-                    f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页 (共 {total_rows} 条)",
+                    f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页",
                     min_value=1,
                     max_value=total_pages,
                     value=st.session_state[f"{table_key}_page"],
