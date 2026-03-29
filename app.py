@@ -27,7 +27,7 @@ st.set_page_config(
 
 apply_custom_styles()
 
-st.markdown('<p class="main-title">📊 CES DI 统计工具</p>', unsafe_allow_html=True)
+st.title("📊 CES DI 统计工具")
 
 
 def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page_size: int = 10, link_column: str = None, all_columns: list = None, table_key: str = "default", pagination: bool = True):
