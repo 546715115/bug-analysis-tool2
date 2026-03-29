@@ -56,6 +56,10 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     session_key = f"table_cols_{table_key}"
     dict_key = f"{session_key}_dict"
     list_key = session_key
+    # 记录初始默认列（用于恢复默认）
+    default_cols_key = f"{session_key}_default"
+    if default_cols_key not in st.session_state:
+        st.session_state[default_cols_key] = display_cols.copy()
 
     if session_key not in st.session_state:
         st.session_state[session_key] = display_cols.copy()
@@ -65,8 +69,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         col_left, col_right = st.columns([1, 1])
         with col_left:
             with st.popover("⚙️ 字段选择", help="点击选择展示哪些字段"):
-                if list_key not in st.session_state:
-                    st.session_state[list_key] = display_cols.copy()
                 if dict_key not in st.session_state:
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
 
@@ -88,7 +90,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
-                        st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
+                        # 使用记录初始默认列来恢复
+                        st.session_state[dict_key] = {col: (col in st.session_state[default_cols_key]) for col in all_columns}
+                        st.session_state[list_key] = st.session_state[default_cols_key].copy()
                         st.rerun()
 
         display_cols = [c for c in st.session_state[list_key] if c in df.columns]
@@ -168,31 +172,15 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         enableCellHtml=True
     )
 
-    # 添加CSS让表格内容和表头居中
+    # 添加CSS让表格内容和表头居中（使用!important确保生效）
     st.markdown("""
     <style>
-    .ag-cell {
+    .stAgGrid .ag-cell {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
     }
-    .ag-header-cell {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # 添加CSS让表格内容和表头居中
-    st.markdown("""
-    <style>
-    .ag-cell {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    .ag-header-cell {
+    .stAgGrid .ag-header-cell {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
