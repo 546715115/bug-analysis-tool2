@@ -129,13 +129,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         final_cols.append("问题详情链接")
         df_display = df_display[final_cols]
 
-        # 分页支持
+        # 分页支持 - 置于表格下方，宽度与⚙️按钮对齐
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
+            total_pages = (total_rows + page_size - 1) // page_size
             page_num = st.number_input(
-                f"页码 (共 {(total_rows + page_size - 1) // page_size} 页)",
+                f"第 页 / {total_pages} 页 (共 {total_rows} 条)",
                 min_value=1,
-                max_value=(total_rows + page_size - 1) // page_size,
+                max_value=total_pages,
                 value=1,
                 step=1,
                 key=f"{table_key}_page"
@@ -143,9 +144,11 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             start_idx = (page_num - 1) * page_size
             end_idx = start_idx + page_size
             df_page = df_display.iloc[start_idx:end_idx]
-            st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
         else:
-            st.dataframe(df_display, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
+            df_page = df_display
+
+        # 渲染表格
+        st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
         return
 
     # 没有链接列，使用 AgGrid
@@ -192,15 +195,21 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     # 添加CSS让表格内容和表头居中（使用!important确保生效）
     st.markdown("""
     <style>
-    .stAgGrid .ag-cell {
+    .stAgGrid .ag-cell,
+    .stAgGrid .ag-cell-inline-editing {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
+        text-align: center !important;
     }
     .stAgGrid .ag-header-cell {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
+        text-align: center !important;
+    }
+    .stAgGrid [col="__checked"] {
+        justify-content: center !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -581,12 +590,15 @@ def main_content():
 
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
-            selected = st.selectbox(
-                "选择版本",
-                options=version_options,
-                index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
-                label_visibility="collapsed"
-            )
+            # 使用窄列使下拉框宽度与标题对齐
+            col1, col2, col3 = st.columns([3, 2, 5])
+            with col1:
+                selected = st.selectbox(
+                    "选择版本",
+                    options=version_options,
+                    index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
+                    label_visibility="collapsed"
+                )
             if selected != st.session_state.selected_version:
                 st.session_state.selected_version = selected
                 st.rerun()
