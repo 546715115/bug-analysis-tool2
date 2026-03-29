@@ -215,9 +215,18 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         'alignItems': 'center'
     }
 
-    # 为每个列配置居中样式
+    # 为每个列配置居中样式和固定宽度
+    col_width = "auto"
     for col in df_display.columns:
-        gb.configure_column(col, headerCellStyle=header_cell_style, cellStyle=cell_style)
+        if "名称" in col or "标题" in col:
+            col_width = 200
+        elif "单号" in col or "版本" in col:
+            col_width = 120
+        elif "DI" in col or "值" in col:
+            col_width = 80
+        else:
+            col_width = 100
+        gb.configure_column(col, headerCellStyle=header_cell_style, cellStyle=cell_style, width=col_width, minWidth=col_width)
 
     grid_options = gb.build()
 
@@ -231,12 +240,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         grid_options['pagination'] = False
         grid_options['suppressPaginationPanel'] = True
 
-    # 列宽自适应
-    grid_options['autoSizeColumns'] = True
     # 表头高度
     grid_options['headerHeight'] = 40
-    # 全局表头样式
-    grid_options['headerCellStyle'] = header_cell_style
 
     AgGrid(
         df_display,
