@@ -3,10 +3,11 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+import plotly.express as px
 
 from config import build_auth_headers
 from crawler import BugCrawler
-from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version
+from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version, get_chart_data
 from di_calculator import (
     calculate_cloud_di, calculate_microservice_di, calculate_microservice_di_with_count,
     filter_production_issues, get_issue_detail_url, is_microservice
@@ -626,38 +627,157 @@ def main_content():
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
 
-        st.divider()
-
-        # 版本过滤
-        st.subheader("🔍 发 现 问 题 版 本")
-
+        # 版本过滤（移至云服务DI概览下方）
+        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
-            # 使用窄列使下拉框宽度与标题对齐
-            col1, col2, col3 = st.columns([3, 2, 5])
-            with col1:
+            # 左侧筛选框 + 右侧合格/不合格，并排
+            col_version, col_badge = st.columns([1, 5])
+            with col_version:
                 selected = st.selectbox(
                     "选择版本",
                     options=version_options,
                     index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
                     label_visibility="collapsed"
                 )
-            if selected != st.session_state.selected_version:
-                st.session_state.selected_version = selected
-                st.rerun()
-            st.caption(f"当前选中：{st.session_state.selected_version}")
+                if selected != st.session_state.selected_version:
+                    st.session_state.selected_version = selected
+                    st.rerun()
+                st.caption(f"当前选中：{st.session_state.selected_version}")
 
-            # 版本筛选后显示合格状态（仅在有筛选时显示）
-            if st.session_state.selected_version != "全部":
-                df_filtered_check = filter_by_version(df_all, st.session_state.selected_version)
-                cloud_di_filtered = calculate_cloud_di(df_filtered_check)
-                ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
-                all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
-                filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
-                badge_html = render_qualified_badge(filtered_qualified)
-                st.markdown(f"<span style='font-size: 1.2em;'>{badge_html}</span>", unsafe_allow_html=True)
+            # 右侧显示合格/不合格
+            with col_badge:
+                if st.session_state.selected_version != "全部":
+                    df_filtered_check = filter_by_version(df_all, st.session_state.selected_version)
+                    cloud_di_filtered = calculate_cloud_di(df_filtered_check)
+                    ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
+                    all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
+                    filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
+                    badge_html = render_qualified_badge(filtered_qualified)
+                    st.markdown(f"<span style='font-size: 1em; display:flex; align-items:center; height:100%;'>{badge_html}</span>", unsafe_allow_html=True)
         else:
             st.info("暂无可用的版本数据")
+
+        # 按版本过滤（提前定义，供图表分析和CES微服务DI明细使用）
+        df_filtered = filter_by_version(df_all, st.session_state.selected_version)
+
+        st.divider()
+
+        # 图表分析
+        st.subheader("📊 图表分析")
+
+        # 获取微服务列表（与微服务查看问题单详情一致）
+        if "assigned_to_domain" in df_filtered.columns:
+            microservices = df_filtered["assigned_to_domain"].dropna().unique()
+            ces_microservices = [ms for ms in microservices if is_microservice(ms)]
+
+            # 图表筛选：微服务下拉框（有"全部"选项，默认选中全部）
+            col_ms, _, _, _ = st.columns([1, 2, 1, 2])
+            with col_ms:
+                selected_ms = st.selectbox(
+                    "选择微服务",
+                    options=["全部"] + list(ces_microservices) if ces_microservices else ["暂无微服务"],
+                    index=0,
+                    key="chart_ms_selector"
+                )
+
+            # 根据选中微服务筛选数据，"全部"时使用全部数据
+            if selected_ms and selected_ms == "全部":
+                df_for_charts = df_filtered
+            elif selected_ms and selected_ms != "暂无微服务":
+                df_for_charts = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
+            else:
+                df_for_charts = df_filtered
+
+            # 按 DI 规则过滤（与微服务查看问题单详情一致）
+            df_for_charts = filter_by_di_rules(df_for_charts)
+
+            # 获取图表数据
+            chart_data = get_chart_data(df_for_charts)
+
+            # 展示三张图表
+            chart_col1, chart_col2, chart_col3 = st.columns(3)
+
+            with chart_col1:
+                st.markdown("**月度问题分布**")
+                if not chart_data["monthly"].empty:
+                    # 柱状图：颜色交替蓝色/浅蓝，柱子上面标记数值标签
+                    colors = ["#1E90FF", "#ADD8E6", "#1E90FF", "#ADD8E6", "#1E90FF"]
+                    fig_bar = px.bar(
+                        chart_data["monthly"],
+                        x="月份",
+                        y="问题单数",
+                        color="月份",
+                        color_discrete_sequence=colors,
+                        text="问题单数"
+                    )
+                    fig_bar.update_traces(width=0.5, textposition="outside")
+                    fig_bar.update_layout(
+                        height=270,
+                        margin=dict(t=30, b=20),
+                        showlegend=False,
+                        xaxis_tickangle=-45,
+                        yaxis_title=None,
+                        xaxis_title=None
+                    )
+                    fig_bar.update_traces(texttemplate="%{text}")
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                else:
+                    st.info("暂无数据")
+
+            with chart_col2:
+                st.markdown("**严重程度分布**")
+                if not chart_data["severity"].empty:
+                    fig_pie1 = px.pie(
+                        chart_data["severity"],
+                        values="数量",
+                        names="severity_level",
+                        color="severity_level",
+                        color_discrete_map={
+                            "致命": "#FF9999",
+                            "严重": "#FFCC99",
+                            "一般": "#99CCFF",
+                            "提示": "#99EE99"
+                        }
+                    )
+                    fig_pie1.update_layout(
+                        height=270,
+                        margin=dict(t=30, b=20),
+                        showlegend=True,
+                        legend=dict(
+                            title="",
+                            orientation="v",
+                            x=1.0,
+                            y=0.5
+                        )
+                    )
+                    st.plotly_chart(fig_pie1, use_container_width=True)
+                else:
+                    st.info("暂无数据")
+
+            with chart_col3:
+                st.markdown("**环境分布**")
+                if not chart_data["environment"].empty:
+                    fig_pie2 = px.pie(
+                        chart_data["environment"],
+                        values="数量",
+                        names="discovered_environment",
+                        color="discovered_environment",
+                        color_discrete_map={
+                            "生产环境": "#99CCFF",
+                            "非生产环境": "#CCEEFF"
+                        }
+                    )
+                    fig_pie2.update_layout(
+                        height=270,
+                        margin=dict(t=30, b=20),
+                        showlegend=True
+                    )
+                    st.plotly_chart(fig_pie2, use_container_width=True)
+                else:
+                    st.info("暂无数据")
+        else:
+            st.info("暂无微服务数据")
 
         st.divider()
 
@@ -665,8 +785,6 @@ def main_content():
         st.subheader("📋 CES 微服务 DI 明细")
 
         # 按版本过滤
-        df_filtered = filter_by_version(df_all, st.session_state.selected_version)
-
         # 计算微服务 DI（包含按 DI 规则过滤后的问题单数）
         ms_di = calculate_microservice_di_with_count(df_filtered)
 
@@ -707,43 +825,47 @@ def main_content():
             display_for_render["问题单数"] = display_for_render["问题单数"].apply(lambda x: f"{x}")
             st.dataframe(display_for_render, hide_index=True, use_container_width=True, height=300)
 
-            # 微服务查看问题单详情（作为独立区块）
-            st.subheader("🔍 微服务查看问题单详情")
+        st.divider()
 
-            if "assigned_to_domain" in df_filtered.columns:
-                microservices = df_filtered["assigned_to_domain"].dropna().unique()
-                ces_microservices = [ms for ms in microservices if is_microservice(ms)]
-                col1, col2 = st.columns([1, 4])
-                with col1:
-                    selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
-                if selected_ms:
-                    ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
-                    # 按 DI 规则过滤
-                    ms_issues_filtered = filter_by_di_rules(ms_issues)
-                    # 按严重程度排序：致命 > 严重 > 一般 > 提示
-                    severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
-                    ms_issues_filtered["_severity_order"] = ms_issues_filtered["severity_level"].map(severity_order).fillna(99)
-                    ms_issues_filtered = ms_issues_filtered.sort_values("_severity_order")
-                    ms_issues_filtered = ms_issues_filtered.drop(columns=["_severity_order"])
-                    # 列名英文转中文
-                    en_to_cn = {
-                        "number": "问题单号",
-                        "discovered_environment": "问题单环境",
-                        "title": "标题",
-                        "severity_level": "严重程度",
-                        "status": "状态",
-                        "assigned_to_domain": "责任服务",
-                        "dev_person": "研发责任人",
-                        "testOwners": "测试责任人",
-                        "from_version": "发现问题版本",
-                        "discovered_time": "发现时间",
-                        "delivery_scenario": "交付场景"
-                    }
-                    ms_display = ms_issues_filtered.rename(columns=en_to_cn)
-                    default_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
-                    # 微服务查看问题单详情可选字段
-                    ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
-                    aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
+        # 微服务查看问题单详情（作为独立区块）
+        st.subheader("🔍 微服务查看问题单详情")
+
+        if "assigned_to_domain" in df_filtered.columns:
+            microservices = df_filtered["assigned_to_domain"].dropna().unique()
+            ces_microservices = [ms for ms in microservices if is_microservice(ms)]
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                selected_ms = st.selectbox("选择微服务", options=["全部"] + list(ces_microservices), index=0)
+            if selected_ms and selected_ms != "全部":
+                ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
+            else:
+                ms_issues = df_filtered
+            # 按 DI 规则过滤
+            ms_issues_filtered = filter_by_di_rules(ms_issues)
+            # 按严重程度排序：致命 > 严重 > 一般 > 提示
+            severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
+            ms_issues_filtered["_severity_order"] = ms_issues_filtered["severity_level"].map(severity_order).fillna(99)
+            ms_issues_filtered = ms_issues_filtered.sort_values("_severity_order")
+            ms_issues_filtered = ms_issues_filtered.drop(columns=["_severity_order"])
+            # 列名英文转中文
+            en_to_cn = {
+                "number": "问题单号",
+                "discovered_environment": "问题单环境",
+                "title": "标题",
+                "severity_level": "严重程度",
+                "status": "状态",
+                "assigned_to_domain": "责任服务",
+                "dev_person": "研发责任人",
+                "testOwners": "测试责任人",
+                "from_version": "发现问题版本",
+                "discovered_time": "发现时间",
+                "delivery_scenario": "交付场景"
+            }
+            ms_display = ms_issues_filtered.rename(columns=en_to_cn)
+            default_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
+            # 微服务查看问题单详情可选字段
+            ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
+            aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
 

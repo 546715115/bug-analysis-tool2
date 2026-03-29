@@ -1,7 +1,9 @@
 # processor.py
 import pandas as pd
+from datetime import datetime, timedelta
+from calendar import monthrange
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 FIELD_MAPPING = {
     "number": ["问题单号", "问题编号"],
@@ -127,3 +129,164 @@ def filter_by_version(df: pd.DataFrame, version: Optional[str] = None) -> pd.Dat
         (df["from_version"].isna()) |
         (df["from_version"] == "")
     ]
+
+
+# ============== 图表相关函数 ==============
+
+def get_month_range(year: int, month: int) -> Tuple[datetime, datetime]:
+    """
+    根据年份和月份获取日期范围
+
+    Args:
+        year: 年份
+        month: 月份（1-12）
+
+    Returns:
+        (start_date, end_date) 元组，月初 00:00:00 到月末 23:59:59
+    """
+    # 月初到月末
+    _, last_day = monthrange(year, month)
+    start_date = datetime(year, month, 1, 0, 0, 0)
+    end_date = datetime(year, month, last_day, 23, 59, 59)
+
+    return start_date, end_date
+
+
+def get_chart_data(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """
+    获取图表所需的数据（已筛选的数据）
+
+    Args:
+        df: 已按微服务过滤的数据
+
+    Returns:
+        {
+            "monthly": 月度分布 DataFrame (columns: ["月份", "问题单数"]),
+            "severity": 严重程度分布 DataFrame (columns: ["severity_level", "数量"]),
+            "environment": 环境分布 DataFrame (columns: ["discovered_environment", "数量"])
+        }
+    """
+    if df.empty:
+        return {
+            "monthly": pd.DataFrame(columns=["月份", "问题单数"]),
+            "severity": pd.DataFrame(columns=["severity_level", "数量"]),
+            "environment": pd.DataFrame(columns=["discovered_environment", "数量"])
+        }
+
+    # 1. 月度分布数据（柱状图：展示本月、上月、上上月、>3个月、>6个月）
+    monthly_data_list = []
+    df_for_charts = df.copy()
+    now = datetime.now()
+
+    # 计算本月、上月、上上月的年份和月份（支持跨年）
+    current_year = now.year
+    current_month = now.month
+
+    # 月度桶：本月、上月、上上月
+    month_list = []
+    for i in range(3):
+        target_month = current_month - i
+        target_year = current_year
+        while target_month < 1:
+            target_month += 12
+            target_year -= 1
+        month_list.append((target_year, target_month, f"{target_month}月"))
+
+    # >3个月：往前3个月（4-6个月前）
+    months_3m = []
+    for i in range(3, 6):
+        target_month = current_month - i
+        target_year = current_year
+        while target_month < 1:
+            target_month += 12
+            target_year -= 1
+        months_3m.append((target_year, target_month))
+
+    # >6个月：7个月前及更早
+    months_6m = []
+    for i in range(6, 13):
+        target_month = current_month - i
+        target_year = current_year
+        while target_month < 1:
+            target_month += 12
+            target_year -= 1
+        months_6m.append((target_year, target_month))
+
+    # 月度桶和>3个月、>6个月使用相同的数据副本，避免重复计算
+    if not df_for_charts.empty and "discovered_time" in df_for_charts.columns:
+        df_temp = df_for_charts.copy()
+        df_temp = df_temp.reset_index(drop=True)
+        df_temp["discovered_time_dt"] = pd.to_datetime(df_temp["discovered_time"], errors="coerce")
+        dt_series = df_temp["discovered_time_dt"]
+
+        # 已统计的日期索引集合
+        counted_indices = set()
+
+        # 月度桶
+        for year, month, month_label in month_list:
+            start_date, end_date = get_month_range(year, month)
+            mask = (
+                (dt_series >= start_date) &
+                (dt_series <= end_date)
+            )
+            count = mask.sum()
+            monthly_data_list.append({"月份": month_label, "问题单数": int(count)})
+            counted_indices.update(df_temp[mask].index.tolist())
+
+        # >3个月
+        mask_3m = pd.Series([False] * len(df_temp), index=df_temp.index)
+        for year, month in months_3m:
+            start_date, end_date = get_month_range(year, month)
+            mask_3m |= (
+                (dt_series >= start_date) &
+                (dt_series <= end_date)
+            )
+        # 排除已统计的
+        mask_3m = mask_3m & ~df_temp.index.isin(counted_indices)
+        count_3m = mask_3m.sum()
+        monthly_data_list.append({"月份": ">3个月", "问题单数": int(count_3m)})
+        counted_indices.update(df_temp[mask_3m].index.tolist())
+
+        # >6个月：包括指定月份范围的 + discovered_time 为空的
+        mask_6m = pd.Series([False] * len(df_temp), index=df_temp.index)
+        for year, month in months_6m:
+            start_date, end_date = get_month_range(year, month)
+            mask_6m |= (
+                (dt_series >= start_date) &
+                (dt_series <= end_date)
+            )
+        # 排除已统计的
+        mask_6m = mask_6m & ~df_temp.index.isin(counted_indices)
+        # discovered_time 为空的也计入 >6个月
+        null_mask = dt_series.isna()
+        count_6m = mask_6m.sum() + null_mask.sum()
+        monthly_data_list.append({"月份": ">6个月", "问题单数": int(count_6m)})
+    else:
+        count_3m = 0
+        count_6m = 0
+
+    monthly_df = pd.DataFrame(monthly_data_list)
+
+    # 2. 严重程度分布
+    df_for_severity = df.copy()
+    if not df_for_severity.empty and "severity_level" in df_for_severity.columns:
+        severity_df = df_for_severity.groupby("severity_level").size().reset_index(name="数量")
+        # 按致命>严重>一般>提示排序
+        severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
+        severity_df["排序"] = severity_df["severity_level"].map(severity_order).fillna(99)
+        severity_df = severity_df.sort_values("排序").drop(columns=["排序"])
+    else:
+        severity_df = pd.DataFrame(columns=["severity_level", "数量"])
+
+    # 3. 环境分布
+    df_for_env = df.copy()
+    if not df_for_env.empty and "discovered_environment" in df_for_env.columns:
+        env_df = df_for_env.groupby("discovered_environment").size().reset_index(name="数量")
+    else:
+        env_df = pd.DataFrame(columns=["discovered_environment", "数量"])
+
+    return {
+        "monthly": monthly_df,
+        "severity": severity_df,
+        "environment": env_df
+    }
