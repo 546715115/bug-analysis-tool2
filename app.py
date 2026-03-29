@@ -72,12 +72,18 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                 if dict_key not in st.session_state:
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
 
+                # 使用session_state直接跟踪每个checkbox的状态，不依赖form机制
+                for col in all_columns:
+                    checkbox_key = f"cb_{session_key}_{col}"
+                    if checkbox_key not in st.session_state:
+                        st.session_state[checkbox_key] = col in display_cols
+
                 with st.form(key=f"form_{session_key}"):
                     st.markdown("**选择展示字段**")
                     st.markdown("---")
                     for col in all_columns:
-                        is_checked = st.checkbox(col, value=st.session_state[dict_key].get(col, False), key=f"{session_key}_{col}")
-                        st.session_state[dict_key][col] = is_checked
+                        checkbox_key = f"cb_{session_key}_{col}"
+                        st.checkbox(col, value=st.session_state[checkbox_key], key=checkbox_key)
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -86,13 +92,13 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        # 从dict_key读取用户选择（因为form提交后widget状态被重置，但dict_key已更新）
-                        new_list = [col for col in all_columns if st.session_state[dict_key].get(col, False)]
+                        new_list = [col for col in all_columns if st.session_state.get(f"cb_{session_key}_{col}", False)]
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
-                        # 使用记录初始默认列来恢复
-                        st.session_state[dict_key] = {col: (col in st.session_state[default_cols_key]) for col in all_columns}
+                        # 恢复所有checkbox为默认状态
+                        for col in all_columns:
+                            st.session_state[f"cb_{session_key}_{col}"] = col in st.session_state[default_cols_key]
                         st.session_state[list_key] = st.session_state[default_cols_key].copy()
                         st.rerun()
 
@@ -151,12 +157,12 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         # 渲染表格
         st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
 
-        # 分页选择器 - 置于表格下方，1/4宽度，右侧与表格对齐
+        # 分页选择器 - 置于表格下方，右侧与表格对齐
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
-            # 使用columns使分页器1/4宽度，右侧与表格对齐
-            col1, col2 = st.columns([3, 1])
+            # 使用columns使分页器更窄（约1/4或更窄）
+            col1, col2 = st.columns([7, 1])
             with col2:
                 new_page = st.number_input(
                     f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页",
