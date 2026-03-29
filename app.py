@@ -201,6 +201,11 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             paginationPageSize=page_size
         )
 
+    # 默认列居中
+    gb.configure_default_column(
+        cellStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
+    )
+
     grid_options = gb.build()
 
     # 分页设置
@@ -216,10 +221,17 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     # 列宽自适应
     grid_options['autoSizeColumns'] = True
 
+    # 自定义CSS居中
+    custom_css = {
+        ".ag-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"},
+        ".ag-header-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"}
+    }
+
     AgGrid(
         df_display,
         gridOptions=grid_options,
         height=height,
+        custom_css=custom_css,
         fit_columns_on_grid_load=True,
         allow_unsafe_jscode=True,
         reload_data=True,
@@ -227,29 +239,6 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         unsafe_allow_html=True,
         enableCellHtml=True
     )
-
-    # 添加CSS让表格内容和表头居中
-    st.markdown("""
-    <style>
-    div[class*="stAgGrid"] .ag-cell,
-    div[class*="stAgGrid"] .ag-cell-inline-editing {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    div[class*="stAgGrid"] .ag-header-cell {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    div[class*="stAgGrid"] .ag-row {
-        text-align: center !important;
-    }
-    div[class*="stAgGrid"] .ag-header-row {
-        text-align: center !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 
 # 英文到中文的列名映射（用于导出，保持与导入格式一致）
