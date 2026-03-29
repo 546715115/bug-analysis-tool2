@@ -245,9 +245,11 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         unsafe_allow_html=True,
         enableCellHtml=True,
         custom_css={
-            ".ag-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"},
-            ".ag-header-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important"},
-            ".ag-header-cell-text": {"text-align": "center !important", "width": "100% !important"}
+            ".ag-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important", "border-right": "1px solid #ddd !important"},
+            ".ag-header-cell": {"display": "flex !important", "justify-content": "center !important", "align-items": "center !important", "border-right": "1px solid #ddd !important"},
+            ".ag-header-cell-text": {"text-align": "center !important", "width": "100% !important"},
+            ".ag-row": {"border-bottom": "1px solid #ddd !important"},
+            ".ag-col-resize": {"border-right": "none !important"}
         }
     )
 
