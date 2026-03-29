@@ -201,13 +201,23 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             paginationPageSize=page_size
         )
 
-    # 为每个列配置居中样式（表头和数据都居中）
+    # 配置居中样式
+    header_cell_style = {
+        'textAlign': 'center',
+        'display': 'flex',
+        'justifyContent': 'center',
+        'alignItems': 'center'
+    }
+    cell_style = {
+        'textAlign': 'center',
+        'display': 'flex',
+        'justifyContent': 'center',
+        'alignItems': 'center'
+    }
+
+    # 为每个列配置居中样式
     for col in df_display.columns:
-        gb.configure_column(
-            col,
-            headerStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'},
-            cellStyle={'textAlign': 'center', 'display': 'flex', 'justifyContent': 'center', 'alignItems': 'center'}
-        )
+        gb.configure_column(col, headerStyle=header_cell_style, cellStyle=cell_style)
 
     grid_options = gb.build()
 
@@ -223,6 +233,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 列宽自适应
     grid_options['autoSizeColumns'] = True
+    # 表头高度
+    grid_options['headerHeight'] = 40
 
     AgGrid(
         df_display,
