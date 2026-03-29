@@ -86,8 +86,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        # 直接从checkbox的session state key读取用户选择
-                        new_list = [col for col in all_columns if st.session_state.get(f"{session_key}_{col}", False)]
+                        # 从dict_key读取用户选择（因为form提交后widget状态被重置，但dict_key已更新）
+                        new_list = [col for col in all_columns if st.session_state[dict_key].get(col, False)]
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
