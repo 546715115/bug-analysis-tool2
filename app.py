@@ -72,18 +72,21 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                 if dict_key not in st.session_state:
                     st.session_state[dict_key] = {col: (col in display_cols) for col in all_columns}
 
-                # 使用session_state直接跟踪每个checkbox的状态，不依赖form机制
-                for col in all_columns:
-                    checkbox_key = f"cb_{session_key}_{col}"
-                    if checkbox_key not in st.session_state:
-                        st.session_state[checkbox_key] = col in display_cols
+                # 初始化当前选中的列列表（从session恢复或使用默认）
+                if list_key not in st.session_state:
+                    st.session_state[list_key] = display_cols.copy()
+                current_selected = st.session_state[list_key]
 
                 with st.form(key=f"form_{session_key}"):
                     st.markdown("**选择展示字段**")
                     st.markdown("---")
+
+                    # 渲染checkbox，直接使用current_selected来确定是否选中
+                    new_selected = []
                     for col in all_columns:
-                        checkbox_key = f"cb_{session_key}_{col}"
-                        st.checkbox(col, value=st.session_state[checkbox_key], key=checkbox_key)
+                        checked = col in current_selected
+                        if st.checkbox(col, value=checked, key=f"cb_{session_key}_{col}"):
+                            new_selected.append(col)
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -92,13 +95,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        new_list = [col for col in all_columns if st.session_state.get(f"cb_{session_key}_{col}", False)]
-                        st.session_state[list_key] = new_list
+                        st.session_state[list_key] = new_selected
                         st.rerun()
                     if reset:
-                        # 恢复所有checkbox为默认状态
-                        for col in all_columns:
-                            st.session_state[f"cb_{session_key}_{col}"] = col in st.session_state[default_cols_key]
                         st.session_state[list_key] = st.session_state[default_cols_key].copy()
                         st.rerun()
 
@@ -161,8 +160,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
-            # 使用columns使分页器更窄（约1/4或更窄）
-            col1, col2 = st.columns([7, 1])
+            # 使用columns使分页器更窄（约1/8）
+            col1, col2 = st.columns([15, 1])
             with col2:
                 new_page = st.number_input(
                     f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页",
@@ -694,16 +693,30 @@ def main_content():
                     ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
                     # 按 DI 规则过滤
                     ms_issues_filtered = filter_by_di_rules(ms_issues)
-                    ms_display = ms_issues_filtered[["number", "discovered_environment", "title", "severity_level", "status"]].copy()
-                    ms_display.columns = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
                     # 按严重程度排序：致命 > 严重 > 一般 > 提示
                     severity_order = {"致命": 0, "严重": 1, "一般": 2, "提示": 3}
-                    ms_display["_severity_order"] = ms_display["严重程度"].map(severity_order).fillna(99)
-                    ms_display = ms_display.sort_values("_severity_order")
-                    ms_display = ms_display.drop(columns=["_severity_order"])
+                    ms_issues_filtered["_severity_order"] = ms_issues_filtered["severity_level"].map(severity_order).fillna(99)
+                    ms_issues_filtered = ms_issues_filtered.sort_values("_severity_order")
+                    ms_issues_filtered = ms_issues_filtered.drop(columns=["_severity_order"])
+                    # 列名英文转中文
+                    en_to_cn = {
+                        "number": "问题单号",
+                        "discovered_environment": "问题单环境",
+                        "title": "标题",
+                        "severity_level": "严重程度",
+                        "status": "状态",
+                        "assigned_to_domain": "责任服务",
+                        "dev_person": "研发责任人",
+                        "testOwners": "测试责任人",
+                        "from_version": "发现问题版本",
+                        "discovered_time": "发现时间",
+                        "delivery_scenario": "交付场景"
+                    }
+                    ms_display = ms_issues_filtered.rename(columns=en_to_cn)
+                    default_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
                     # 微服务查看问题单详情可选字段
                     ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
-                    aggrid_table(ms_display, ["问题单号", "问题单环境", "标题", "严重程度", "状态"], height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
+                    aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
 
