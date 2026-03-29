@@ -129,19 +129,20 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         final_cols.append("问题详情链接")
         df_display = df_display[final_cols]
 
-        # 分页支持 - 置于表格下方，宽度与⚙️按钮对齐
+        # 分页支持 - 根据页码切片数据
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
-            page_num = st.number_input(
-                f"第 页 / {total_pages} 页 (共 {total_rows} 条)",
-                min_value=1,
-                max_value=total_pages,
-                value=1,
-                step=1,
-                key=f"{table_key}_page"
-            )
-            start_idx = (page_num - 1) * page_size
+            # 获取当前页码（如果session state中没有则默认为1）
+            current_page_key = f"{table_key}_page"
+            if current_page_key not in st.session_state:
+                st.session_state[current_page_key] = 1
+            current_page = st.session_state[current_page_key]
+            # 确保当前页码在有效范围内
+            if current_page > total_pages:
+                current_page = total_pages
+                st.session_state[current_page_key] = current_page
+            start_idx = (current_page - 1) * page_size
             end_idx = start_idx + page_size
             df_page = df_display.iloc[start_idx:end_idx]
         else:
@@ -149,6 +150,24 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
         # 渲染表格
         st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
+
+        # 分页选择器 - 置于表格下方，宽度与⚙️按钮对齐
+        if pagination and len(df_display) > page_size:
+            total_rows = len(df_display)
+            total_pages = (total_rows + page_size - 1) // page_size
+            col1, col2, col3 = st.columns([1, 2, 6])
+            with col2:
+                new_page = st.number_input(
+                    f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页 (共 {total_rows} 条)",
+                    min_value=1,
+                    max_value=total_pages,
+                    value=st.session_state[f"{table_key}_page"],
+                    step=1,
+                    key=f"{table_key}_page_input"
+                )
+                if new_page != st.session_state.get(f"{table_key}_page", 1):
+                    st.session_state[f"{table_key}_page"] = new_page
+                    st.rerun()
         return
 
     # 没有链接列，使用 AgGrid
