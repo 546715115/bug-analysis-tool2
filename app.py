@@ -228,24 +228,25 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         enableCellHtml=True
     )
 
-    # 添加CSS让表格内容和表头居中（使用!important确保生效）
+    # 添加CSS让表格内容和表头居中
     st.markdown("""
     <style>
-    .stAgGrid .ag-cell,
-    .stAgGrid .ag-cell-inline-editing {
+    div[class*="stAgGrid"] .ag-cell,
+    div[class*="stAgGrid"] .ag-cell-inline-editing {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        text-align: center !important;
     }
-    .stAgGrid .ag-header-cell {
+    div[class*="stAgGrid"] .ag-header-cell {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
+    }
+    div[class*="stAgGrid"] .ag-row {
         text-align: center !important;
     }
-    .stAgGrid [col="__checked"] {
-        justify-content: center !important;
+    div[class*="stAgGrid"] .ag-header-row {
+        text-align: center !important;
     }
     </style>
     """, unsafe_allow_html=True)
