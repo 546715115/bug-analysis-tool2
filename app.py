@@ -160,20 +160,21 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         if pagination and len(df_display) > page_size:
             total_rows = len(df_display)
             total_pages = (total_rows + page_size - 1) // page_size
-            # 使用columns使分页器更窄（约1/8）
-            col1, col2 = st.columns([15, 1])
-            with col2:
-                new_page = st.number_input(
-                    f"第 {st.session_state[f'{table_key}_page']} / {total_pages} 页",
-                    min_value=1,
-                    max_value=total_pages,
-                    value=st.session_state[f"{table_key}_page"],
-                    step=1,
-                    key=f"{table_key}_page_input"
-                )
-                if new_page != st.session_state.get(f"{table_key}_page", 1):
-                    st.session_state[f"{table_key}_page"] = new_page
-                    st.rerun()
+            current_page = st.session_state.get(f"{table_key}_page", 1)
+            # 使用自定义按钮实现紧凑分页
+            col_prev, col_page, col_next = st.columns([1, 2, 1])
+            with col_prev:
+                if st.button("◀", key=f"{table_key}_prev", use_container_width=True):
+                    if current_page > 1:
+                        st.session_state[f"{table_key}_page"] = current_page - 1
+                        st.rerun()
+            with col_page:
+                st.write(f"第 {current_page} / {total_pages} 页 (共 {total_rows} 条)")
+            with col_next:
+                if st.button("▶", key=f"{table_key}_next", use_container_width=True):
+                    if current_page < total_pages:
+                        st.session_state[f"{table_key}_page"] = current_page + 1
+                        st.rerun()
         return
 
     # 没有链接列，使用 AgGrid
@@ -766,6 +767,10 @@ def main_content():
         cols_to_show = [c for c in ordered_cols if c in df_display.columns]
         # 问题单明细可选字段
         issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
+        # 补充缺失的列（确保df_display包含all_columns中的所有列）
+        for col in issue_detail_all_cols:
+            if col not in df_display.columns:
+                df_display[col] = ""
         if cols_to_show:
             aggrid_table(df_display, cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
         else:
