@@ -86,7 +86,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
                         reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
-                        new_list = [col for col in all_columns if st.session_state[dict_key].get(col, False)]
+                        # 直接从checkbox的session state key读取用户选择
+                        new_list = [col for col in all_columns if st.session_state.get(f"{session_key}_{col}", False)]
                         st.session_state[list_key] = new_list
                         st.rerun()
                     if reset:
@@ -128,7 +129,23 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
         final_cols.append("问题详情链接")
         df_display = df_display[final_cols]
 
-        st.dataframe(df_display, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
+        # 分页支持
+        if pagination and len(df_display) > page_size:
+            total_rows = len(df_display)
+            page_num = st.number_input(
+                f"页码 (共 {(total_rows + page_size - 1) // page_size} 页)",
+                min_value=1,
+                max_value=(total_rows + page_size - 1) // page_size,
+                value=1,
+                step=1,
+                key=f"{table_key}_page"
+            )
+            start_idx = (page_num - 1) * page_size
+            end_idx = start_idx + page_size
+            df_page = df_display.iloc[start_idx:end_idx]
+            st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
+        else:
+            st.dataframe(df_display, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
         return
 
     # 没有链接列，使用 AgGrid
