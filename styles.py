@@ -37,6 +37,13 @@ def apply_custom_styles():
     .dataframe {
         font-size: 0.9rem;
     }
+    /* 强制DataFrame所有单元格左对齐（统一数字列和文本列的显示） */
+    [data-testid="stDataFrame"] td {
+        text-align: left !important;
+    }
+    [data-testid="stDataFrame"] th {
+        text-align: left !important;
+    }
     /* 侧边栏样式 */
     .css-1d391kg {
         background-color: #f8f9fa;

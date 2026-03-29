@@ -700,8 +700,12 @@ def main_content():
             display_df_sorted = display_df.sort_values("DI 值", ascending=False)
             display_df_sorted = pd.concat([display_df_sorted, total_row], ignore_index=True)
 
-            # 使用st.dataframe渲染（响应式、居中、分隔线）
-            st.dataframe(display_df_sorted, hide_index=True, use_container_width=True, height=300)
+            # 使用st.dataframe渲染（响应式布局）
+            # 数字列转字符串，利用Streamlit对文本的左对齐实现视觉统一
+            display_for_render = display_df_sorted.copy()
+            display_for_render["DI 值"] = display_for_render["DI 值"].apply(lambda x: f"{x}")
+            display_for_render["问题单数"] = display_for_render["问题单数"].apply(lambda x: f"{x}")
+            st.dataframe(display_for_render, hide_index=True, use_container_width=True, height=300)
 
             # 微服务查看问题单详情（作为独立区块）
             st.subheader("🔍 微服务查看问题单详情")
@@ -709,7 +713,9 @@ def main_content():
             if "assigned_to_domain" in df_filtered.columns:
                 microservices = df_filtered["assigned_to_domain"].dropna().unique()
                 ces_microservices = [ms for ms in microservices if is_microservice(ms)]
-                selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
+                col1, col2 = st.columns([1, 4])
+                with col1:
+                    selected_ms = st.selectbox("选择微服务", options=list(ces_microservices))
                 if selected_ms:
                     ms_issues = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
                     # 按 DI 规则过滤
