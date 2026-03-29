@@ -217,7 +217,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 为每个列配置居中样式
     for col in df_display.columns:
-        gb.configure_column(col, headerStyle=header_cell_style, cellStyle=cell_style)
+        gb.configure_column(col, headerCellStyle=header_cell_style, cellStyle=cell_style)
 
     grid_options = gb.build()
 
@@ -235,6 +235,8 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
     grid_options['autoSizeColumns'] = True
     # 表头高度
     grid_options['headerHeight'] = 40
+    # 全局表头样式
+    grid_options['headerCellStyle'] = header_cell_style
 
     AgGrid(
         df_display,
