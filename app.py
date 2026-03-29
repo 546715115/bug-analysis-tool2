@@ -8,6 +8,7 @@ import plotly.express as px
 from config import build_auth_headers
 from crawler import BugCrawler
 from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version, get_chart_data
+from cache import save_cache, load_cache, list_caches, delete_cache
 from di_calculator import (
     calculate_cloud_di, calculate_microservice_di, calculate_microservice_di_with_count,
     filter_production_issues, get_issue_detail_url, is_microservice
@@ -461,6 +462,57 @@ def render_sidebar():
                     except Exception as e:
                         st.error(f"加载失败: {e}")
 
+    # 本地缓存（默认折叠，仅Excel导入场景）
+    with st.expander("💾 本地缓存", expanded=False):
+        st.caption("缓存 Excel 导入的合并去重数据，刷新页面不丢失")
+
+        # 缓存当前数据
+        if st.button("💾 缓存当前数据", type="primary", use_container_width=True, disabled=st.session_state.df_raw.empty):
+            if st.session_state.df_raw.empty:
+                st.warning("当前没有可缓存的数据")
+            else:
+                success, msg = save_cache(st.session_state.df_raw, st.session_state.versions)
+                if success:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+
+        # 加载当前数据
+        caches = list_caches()
+        if caches:
+            cache_options = [c["filename"] for c in caches]
+            # 格式化显示：文件名 + 数据条数 + 时间
+            cache_labels = [f"{c['filename']} ({c['df_rows']}条)" for c in caches]
+            selected_cache = st.selectbox(
+                "📂 加载缓存数据",
+                options=cache_labels,
+                key="cache_selector"
+            )
+            if st.button("加载", use_container_width=True):
+                # 找到对应的 cache
+                idx = cache_labels.index(selected_cache)
+                cache_filename = cache_options[idx]
+                success, msg, cache_data = load_cache(cache_filename)
+                if success and cache_data:
+                    st.session_state.df_raw = cache_data["df_raw"]
+                    st.session_state.versions = cache_data["versions"]
+                    st.session_state.selected_version = "全部"
+                    st.success(f"加载成功: {len(st.session_state.df_raw)} 条数据")
+                    st.session_state.sidebar_collapsed = True
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+            # 卸载当前数据
+            if st.button("🗑️ 卸载当前数据", use_container_width=True):
+                st.session_state.df_raw = pd.DataFrame()
+                st.session_state.versions = []
+                st.session_state.selected_version = "全部"
+                st.success("已卸载数据")
+                st.rerun()
+        else:
+            st.info("暂无缓存数据")
+
 def main_content():
     """主页面内容"""
 
@@ -560,11 +612,15 @@ def main_content():
         # 数据预处理
         df_all = filter_production_issues(st.session_state.df_raw)
 
+        # 按版本过滤（云服务概览使用过滤后的数据）
+        df_filtered = filter_by_version(df_all, st.session_state.selected_version)
+
         # 云服务概览
         st.subheader("☁️ 云服务 DI 概览")
 
-        cloud_di_info = calculate_cloud_di(df_all)
-        ms_di_all = calculate_microservice_di_with_count(df_all)
+        cloud_di_info = calculate_cloud_di(df_filtered)
+        st.write(f"DI调试: 总有效DI={cloud_di_info['di']}, debug={cloud_di_info.get('debug', {})}")
+        ms_di_all = calculate_microservice_di_with_count(df_filtered)
         # 合格标准：云服务 DI < 20 且 所有微服务 DI < 5
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
         overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
@@ -657,9 +713,6 @@ def main_content():
                     st.markdown(f"<span style='font-size: 1em; display:flex; align-items:center; height:100%;'>{badge_html}</span>", unsafe_allow_html=True)
         else:
             st.info("暂无可用的版本数据")
-
-        # 按版本过滤（提前定义，供图表分析和CES微服务DI明细使用）
-        df_filtered = filter_by_version(df_all, st.session_state.selected_version)
 
         st.divider()
 

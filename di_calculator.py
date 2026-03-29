@@ -237,23 +237,31 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
 def calculate_cloud_di(df: pd.DataFrame) -> Dict:
     """计算云服务级别 DI"""
     if df.empty:
-        return {"di": 0, "issue_count": 0, "qualified": True}
+        return {"di": 0, "issue_count": 0, "qualified": True, "debug": {"di_0": 0, "di_gt_0": 0}}
+
+    # 只保留 CES 微服务计算 DI
+    ces_df = df[df["assigned_to_domain"].apply(is_microservice)].copy()
 
     current_time = datetime.now()
     total_di = 0
-    issue_count = 0
+    issue_count = len(df)  # 总问题单统计所有数据
+    debug_counts = {"di_0": 0, "di_gt_0": 0}
 
-    for _, row in df.iterrows():
+    for _, row in ces_df.iterrows():
         di = calculate_di_for_issue(row, current_time)
         total_di += di
-        issue_count += 1
+        if di > 0:
+            debug_counts["di_gt_0"] += 1
+        else:
+            debug_counts["di_0"] += 1
 
     qualified = total_di < QUALIFICATION_THRESHOLDS["云服务"]
 
     return {
         "di": round(total_di, 1),
         "issue_count": issue_count,
-        "qualified": qualified
+        "qualified": qualified,
+        "debug": debug_counts
     }
 
 
