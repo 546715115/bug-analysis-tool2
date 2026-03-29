@@ -696,9 +696,12 @@ def main_content():
                 "问题单数": total_issues,
                 "是否合格": total_qualified
             }])
-            display_df = pd.concat([display_df, total_row], ignore_index=True)
+            # 按DI值从大到小排序（总计行除外，最后单独添加）
+            display_df_sorted = display_df.sort_values("DI 值", ascending=False)
+            display_df_sorted = pd.concat([display_df_sorted, total_row], ignore_index=True)
 
-            aggrid_table(display_df, ["微服务名", "DI 值", "问题单数", "是否合格"], height=300, pagination=False)
+            # 使用st.dataframe渲染（响应式、居中、分隔线）
+            st.dataframe(display_df_sorted, hide_index=True, use_container_width=True, height=300)
 
             # 微服务查看问题单详情（作为独立区块）
             st.subheader("🔍 微服务查看问题单详情")
