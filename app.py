@@ -894,7 +894,7 @@ def main_content():
             # 列名英文转中文
             en_to_cn = {
                 "number": "问题单号",
-                "discovered_environment": "问题单环境",
+                "discovered_environment": "发现环境",
                 "title": "标题",
                 "severity_level": "严重程度",
                 "status": "状态",
@@ -906,9 +906,9 @@ def main_content():
                 "delivery_scenario": "交付场景"
             }
             ms_display = ms_issues_filtered.rename(columns=en_to_cn)
-            default_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
+            default_cols = ["问题单号", "发现环境", "标题", "严重程度", "状态"]
             # 微服务查看问题单详情可选字段
-            ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
+            ms_detail_all_cols = ["问题单号", "发现环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
             aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
@@ -921,10 +921,10 @@ def main_content():
         # 按 DI 规则过滤
         df_di_filtered = filter_by_di_rules(df_filtered)
 
-        # 英文到中文的显示映射
+        # 英文到中文的显示映射（与 EN_TO_CN_MAPPING 保持一致）
         en_to_cn_display = {
             "number": "问题单号",
-            "discovered_environment": "问题单环境",
+            "discovered_environment": "发现环境",
             "title": "标题",
             "severity_level": "严重程度",
             "status": "问题状态",
@@ -933,7 +933,12 @@ def main_content():
             "from_version": "发现问题版本",
             "dev_person": "研发责任人",
             "testOwners": "测试责任人",
-            "delivery_scenario": "交付场景"
+            "delivery_scenario": "交付场景",
+            "valid": "挂起/撤销",
+            "labels": "标签",
+            "discover_iteration": "发现迭代",
+            "created_time": "创建时间",
+            "discovered_time": "发现时间",
         }
 
         # 尝试把英文列名转中文，如果原列名是中文直接用
@@ -955,10 +960,10 @@ def main_content():
         df_display = df_display.drop(columns=["_severity_order"])
 
         # 显示可用的列（按问题单号、环境、标题、严重程度、状态顺序）
-        ordered_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景"]
+        ordered_cols = ["问题单号", "发现环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景"]
         cols_to_show = [c for c in ordered_cols if c in df_display.columns]
         # 问题单明细可选字段
-        issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
+        issue_detail_all_cols = ["问题单号", "发现环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
         # 补充缺失的列（确保df_display包含all_columns中的所有列）
         for col in issue_detail_all_cols:
             if col not in df_display.columns:
