@@ -110,8 +110,8 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
     stage = str(stage).strip() if not pd.isna(stage) else ""
     env = str(discovered_environment).strip() if not pd.isna(discovered_environment) else ""
 
-    # 非生产环境
-    if env == "非生产环境":
+    # 非生产环境：除了"生产环境"之外，其他都是非生产环境
+    if env != "生产环境":
         # 待提交/空 → 不统计
         if status == "待提交" and stage == "":
             return False, "非生产-待提交"
