@@ -618,6 +618,37 @@ def main_content():
         # 云服务概览
         st.subheader("☁️ 云服务 DI 概览")
 
+        # 版本过滤（移至云服务DI概览下方）
+        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
+        if st.session_state.versions:
+            version_options = ["全部"] + sorted(st.session_state.versions)
+            # 左侧筛选框 + 右侧合格/不合格，并排
+            col_version, col_badge = st.columns([1, 5])
+            with col_version:
+                selected = st.selectbox(
+                    "选择版本",
+                    options=version_options,
+                    index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
+                    label_visibility="collapsed"
+                )
+                if selected != st.session_state.selected_version:
+                    st.session_state.selected_version = selected
+                    st.rerun()
+                st.caption(f"当前选中：{st.session_state.selected_version}")
+
+            # 右侧显示合格/不合格
+            with col_badge:
+                if st.session_state.selected_version != "全部":
+                    df_filtered_check = filter_by_version(df_all, st.session_state.selected_version)
+                    cloud_di_filtered = calculate_cloud_di(df_filtered_check)
+                    ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
+                    all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
+                    filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
+                    badge_html = render_qualified_badge(filtered_qualified)
+                    st.markdown(f"<span style='font-size: 1em; display:flex; align-items:center; height:100%;'>{badge_html}</span>", unsafe_allow_html=True)
+        else:
+            st.info("暂无可用的版本数据")
+
         cloud_di_info = calculate_cloud_di(df_filtered)
         ms_di_all = calculate_microservice_di_with_count(df_filtered)
         # 合格标准：云服务 DI < 20 且 所有微服务 DI < 5
@@ -681,37 +712,6 @@ def main_content():
             if st.button("📥 导出版本有效DI-Excel", width='stretch'):
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
-
-        # 版本过滤（移至云服务DI概览下方）
-        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
-        if st.session_state.versions:
-            version_options = ["全部"] + sorted(st.session_state.versions)
-            # 左侧筛选框 + 右侧合格/不合格，并排
-            col_version, col_badge = st.columns([1, 5])
-            with col_version:
-                selected = st.selectbox(
-                    "选择版本",
-                    options=version_options,
-                    index=version_options.index(st.session_state.selected_version) if st.session_state.selected_version in version_options else 0,
-                    label_visibility="collapsed"
-                )
-                if selected != st.session_state.selected_version:
-                    st.session_state.selected_version = selected
-                    st.rerun()
-                st.caption(f"当前选中：{st.session_state.selected_version}")
-
-            # 右侧显示合格/不合格
-            with col_badge:
-                if st.session_state.selected_version != "全部":
-                    df_filtered_check = filter_by_version(df_all, st.session_state.selected_version)
-                    cloud_di_filtered = calculate_cloud_di(df_filtered_check)
-                    ms_di_filtered = calculate_microservice_di_with_count(df_filtered_check)
-                    all_ms_qualified = ms_di_filtered["qualified"].all() if not ms_di_filtered.empty else True
-                    filtered_qualified = cloud_di_filtered["qualified"] and all_ms_qualified
-                    badge_html = render_qualified_badge(filtered_qualified)
-                    st.markdown(f"<span style='font-size: 1em; display:flex; align-items:center; height:100%;'>{badge_html}</span>", unsafe_allow_html=True)
-        else:
-            st.info("暂无可用的版本数据")
 
         st.divider()
 
