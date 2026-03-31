@@ -139,8 +139,8 @@ class BugCrawler:
         test_owners_text = test_owners[0].get("name", "") if test_owners else ""
 
         # 处理发现问题版本
-        from_version = item.get("fromVersion", {})
-        from_version_text = from_version.get("number", "") if from_version else ""
+        from_version = item.get("fromVersion", {}) or {}
+        from_version_text = from_version.get("title", "") or from_version.get("number", "")
 
         # 处理有效标志
         valid = item.get("valid")
