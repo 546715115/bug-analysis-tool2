@@ -872,7 +872,7 @@ def main_content():
             display_for_render = display_df_sorted.copy()
             display_for_render["DI 值"] = display_for_render["DI 值"].apply(lambda x: f"{x}")
             display_for_render["问题单数"] = display_for_render["问题单数"].apply(lambda x: f"{x}")
-            st.dataframe(display_for_render, hide_index=True, width='stretch', height=300)
+            st.dataframe(display_for_render, hide_index=True, width='stretch', height=350)
 
         st.divider()
 
