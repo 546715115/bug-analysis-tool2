@@ -81,7 +81,7 @@ def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
 
     # 非生产环境且挂起/撤销的问题单剔除
     mask = (
-        (result.get("discovered_environment") == "非生产环境") &
+        (result.get("discovered_environment") != "生产环境") &
         (result.get("valid") == "挂起")
     )
     result = result.loc[~mask]
