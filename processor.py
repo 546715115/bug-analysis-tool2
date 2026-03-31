@@ -11,7 +11,7 @@ FIELD_MAPPING = {
     "severity_level": ["严重程度"],
     "status": ["问题状态", "状态"],
     "assigned_to_domain": ["责任服务", "负责域"],
-    "from_version": ["发现问题版本", "版本"],
+    "from_version": ["发现问题版本"],
     "discover_iteration": ["发现迭代"],
     "created_time": ["创建时间"],
     "stage": ["问题阶段"],
@@ -20,7 +20,7 @@ FIELD_MAPPING = {
     "valid": ["挂起/撤销"],
     "discovered_environment": ["发现环境"],
     "labels": ["标签"],
-    "dev_person": ["研发责任人"],
+    "dev_person": ["责任人"],
     "testOwners": ["测试责任人"]
 }
 
