@@ -141,12 +141,28 @@ class BugCrawler:
         # 处理研发责任人（优先使用 current_owners，fallback 到 develop_owners）
         current_owners = item.get("current_owners", []) or []
         develop_owners = item.get("develop_owners", []) or []
+        # Debug: 打印 owner 字段情况
+        if not current_owners and not develop_owners:
+            print(f"[DEBUG] number={item.get('number')}, keys={list(item.keys())}")
         owners = current_owners if current_owners else develop_owners
-        dev_person = owners[0].get("name", "") if owners else ""
 
-        # 处理测试责任人
+        # 处理 owners 可能的不同格式：列表、单个对象、或空
+        if isinstance(owners, list) and len(owners) > 0:
+            dev_person = owners[0].get("name", "")
+        elif isinstance(owners, dict):
+            # 单个对象格式
+            dev_person = owners.get("name", "") or owners.get("owner", "") or ""
+        else:
+            dev_person = ""
+
+        # 处理测试责任人（支持列表和单个对象格式）
         test_owners = item.get("test_owners", []) or []
-        test_owners_text = test_owners[0].get("name", "") if test_owners else ""
+        if isinstance(test_owners, list) and len(test_owners) > 0:
+            test_owners_text = test_owners[0].get("name", "")
+        elif isinstance(test_owners, dict):
+            test_owners_text = test_owners.get("name", "") or ""
+        else:
+            test_owners_text = ""
 
         # 处理发现问题版本
         from_version = item.get("fromVersion", {}) or {}
