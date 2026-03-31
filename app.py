@@ -276,7 +276,7 @@ EN_TO_CN_MAPPING = {
     "valid": "挂起/撤销",
     "discovered_environment": "发现环境",
     "labels": "标签",
-    "dev_person": "责任人",
+    "dev_person": "研发责任人",
     "testOwners": "测试责任人",
 }
 
@@ -909,7 +909,7 @@ def main_content():
                 "severity_level": "严重程度",
                 "status": "状态",
                 "assigned_to_domain": "责任服务",
-                "dev_person": "责任人",
+                "dev_person": "研发责任人",
                 "testOwners": "测试责任人",
                 "from_version": "发现问题版本",
                 "discovered_time": "发现时间",
@@ -918,7 +918,7 @@ def main_content():
             ms_display = ms_issues_filtered.rename(columns=en_to_cn)
             default_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态"]
             # 微服务查看问题单详情可选字段
-            ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
+            ms_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
             aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
@@ -941,7 +941,7 @@ def main_content():
             "stage": "问题阶段",
             "assigned_to_domain": "责任服务",
             "from_version": "发现问题版本",
-            "dev_person": "责任人",
+            "dev_person": "研发责任人",
             "testOwners": "测试责任人",
             "delivery_scenario": "交付场景"
         }
@@ -965,10 +965,10 @@ def main_content():
         df_display = df_display.drop(columns=["_severity_order"])
 
         # 显示可用的列（按问题单号、环境、标题、严重程度、状态顺序）
-        ordered_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "责任人", "测试责任人", "交付场景"]
+        ordered_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景"]
         cols_to_show = [c for c in ordered_cols if c in df_display.columns]
         # 问题单明细可选字段
-        issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
+        issue_detail_all_cols = ["问题单号", "问题单环境", "标题", "严重程度", "问题状态", "问题阶段", "责任服务", "发现问题版本", "研发责任人", "测试责任人", "交付场景", "挂起/撤销", "标签", "发现迭代", "创建时间", "发现时间"]
         # 补充缺失的列（确保df_display包含all_columns中的所有列）
         for col in issue_detail_all_cols:
             if col not in df_display.columns:
