@@ -107,16 +107,17 @@ class BugCrawler:
     def _parse_issue(self, item: Dict) -> Dict:
         """解析单条问题单数据"""
         # 处理 status 和 stage
-        status = item.get("status", "")
-        stage = item.get("stage", "") or ""
+        api_status = item.get("status", "")
+        api_stage = item.get("stage", "") or ""
 
         # 获取 status 映射
-        status_text = STATUS_MAPPING.get(status, status)
+        status_text = STATUS_MAPPING.get(api_status, api_status)
 
-        # 如果是 FIXING 状态，需要结合 stage 确定具体状态
-        if status == "ISSUE_STATUS_FIXING" and stage:
-            stage_text = STAGE_MAPPING.get(stage, stage)
-            status_text = f"修复/{stage_text}"
+        # 如果是 FIXING 状态，需要结合 stage 确定 stage 的中文值
+        # status 保持为 "修复"，stage 映射为中文
+        stage = ""
+        if api_status == "ISSUE_STATUS_FIXING" and api_stage:
+            stage = STAGE_MAPPING.get(api_stage, api_stage)
 
         # 处理 severity
         severity_code = item.get("severity", "")
