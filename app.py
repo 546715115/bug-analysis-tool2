@@ -713,8 +713,6 @@ def main_content():
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
 
-        st.divider()
-
         # 图表分析
         st.subheader("📊 图表分析")
 
