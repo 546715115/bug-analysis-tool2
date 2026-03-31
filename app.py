@@ -654,7 +654,6 @@ def main_content():
                 st.markdown("")
                 # 生产环境和非生产环境规则表格
                 st.markdown("**DI 统计规则**")
-                st.caption("注：非生产环境 = 除了"生产环境"之外的所有环境")
                 table_html = """
                 <table style='width:100%; border-collapse: collapse; font-size: 0.85em;'>
                 <thead>
