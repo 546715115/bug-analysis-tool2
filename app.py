@@ -51,7 +51,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     display_cols = [c for c in columns if c in df.columns]
     if not display_cols:
-        st.dataframe(df, hide_index=True, width='stretch', height=height)
+        st.dataframe(df, hide_index=True, use_container_width=True, height=height)
         return
 
     # 初始化列选择状态
@@ -99,9 +99,9 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
                     col1, col2 = st.columns(2)
                     with col1:
-                        submitted = st.form_submit_button("确认", type="primary", width='stretch')
+                        submitted = st.form_submit_button("确认", type="primary", use_container_width=True)
                     with col2:
-                        reset = st.form_submit_button("恢复默认", width='stretch')
+                        reset = st.form_submit_button("恢复默认", use_container_width=True)
 
                     if submitted:
                         st.session_state[list_key] = new_selected
@@ -164,7 +164,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             df_page = df_display
 
         # 渲染表格
-        st.dataframe(df_page, column_config=column_configs, hide_index=True, width='stretch', height=height)
+        st.dataframe(df_page, column_config=column_configs, hide_index=True, use_container_width=True, height=height)
 
         # 分页选择器 - 置于表格下方，右对齐
         if pagination and len(df_display) > page_size:
@@ -176,14 +176,14 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
             with col_pagination:
                 col_prev, col_page, col_next = st.columns([1, 2, 1])
                 with col_prev:
-                    if st.button("◀", key=f"{table_key}_prev", width='stretch'):
+                    if st.button("◀", key=f"{table_key}_prev", use_container_width=True):
                         if current_page > 1:
                             st.session_state[f"{table_key}_page"] = current_page - 1
                             st.rerun()
                 with col_page:
                     st.write(f"第 {current_page}/{total_pages}")
                 with col_next:
-                    if st.button("▶", key=f"{table_key}_next", width='stretch'):
+                    if st.button("▶", key=f"{table_key}_next", use_container_width=True):
                         if current_page < total_pages:
                             st.session_state[f"{table_key}_page"] = current_page + 1
                             st.rerun()
@@ -191,7 +191,7 @@ def aggrid_table(df: pd.DataFrame, columns: list = None, height: int = 300, page
 
     # 没有链接列，使用 AgGrid
     if not AGGRID_AVAILABLE:
-        st.dataframe(df_display, hide_index=True, width='stretch', height=height)
+        st.dataframe(df_display, hide_index=True, use_container_width=True, height=height)
         return
 
     gb = GridOptionsBuilder.from_dataframe(df_display)
@@ -365,7 +365,7 @@ def render_sidebar():
             help="多个 Domain 用逗号分隔，如: 11, 33921"
         )
 
-        if st.button("🔍 分析数据", type="primary", width='stretch'):
+        if st.button("🔍 分析数据", type="primary", use_container_width=True):
             if not cookie or not authorization or not user_id:
                 st.error("请填写完整的认证信息")
             else:
@@ -428,7 +428,7 @@ def render_sidebar():
             if uploaded:
                 uploaded_files.append(uploaded)
 
-        if st.button("📂 加载 Excel", type="primary", width='stretch'):
+        if st.button("📂 加载 Excel", type="primary", use_container_width=True):
             if not uploaded_files:
                 st.error("请至少导入一个 Excel 文件")
             else:
@@ -467,7 +467,7 @@ def render_sidebar():
         st.caption("缓存 Excel 导入的合并去重数据，刷新页面不丢失")
 
         # 缓存当前数据
-        if st.button("💾 缓存当前数据", type="primary", width='stretch', disabled=st.session_state.df_raw.empty):
+        if st.button("💾 缓存当前数据", type="primary", use_container_width=True, disabled=st.session_state.df_raw.empty):
             if st.session_state.df_raw.empty:
                 st.warning("当前没有可缓存的数据")
             else:
@@ -488,7 +488,7 @@ def render_sidebar():
                 options=cache_labels,
                 key="cache_selector"
             )
-            if st.button("加载", width='stretch'):
+            if st.button("加载", use_container_width=True):
                 # 找到对应的 cache
                 idx = cache_labels.index(selected_cache)
                 cache_filename = cache_options[idx]
@@ -504,7 +504,7 @@ def render_sidebar():
                     st.error(msg)
 
             # 卸载当前数据
-            if st.button("🗑️ 卸载当前数据", width='stretch'):
+            if st.button("🗑️ 卸载当前数据", use_container_width=True):
                 st.session_state.df_raw = pd.DataFrame()
                 st.session_state.versions = []
                 st.session_state.selected_version = "全部"
@@ -663,7 +663,7 @@ def main_content():
         # 合格标准和导出按钮都在第四列
         with col4:
             # 第一行：合格标准
-            with st.popover("合格标准", width='stretch'):
+            with st.popover("合格标准", use_container_width=True):
                 st.markdown("**合格标准：**")
                 st.markdown("云服务 DI < 20 **且** 微服务 DI < 5，同时满足方为合格")
                 st.markdown("")
@@ -709,7 +709,7 @@ def main_content():
                 """
                 st.markdown(table_html, unsafe_allow_html=True)
             # 第二行：导出按钮
-            if st.button("📥 导出版本有效DI-Excel", width='stretch'):
+            if st.button("📥 导出版本有效DI-Excel", use_container_width=True):
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
 
@@ -770,7 +770,7 @@ def main_content():
                         xaxis_title=None
                     )
                     fig_bar.update_traces(texttemplate="%{text}")
-                    st.plotly_chart(fig_bar, width='stretch')
+                    st.plotly_chart(fig_bar, use_container_width=True)
                 else:
                     st.info("暂无数据")
 
@@ -800,7 +800,7 @@ def main_content():
                             y=0.5
                         )
                     )
-                    st.plotly_chart(fig_pie1, width='stretch')
+                    st.plotly_chart(fig_pie1, use_container_width=True)
                 else:
                     st.info("暂无数据")
 
@@ -822,7 +822,7 @@ def main_content():
                         margin=dict(t=30, b=20),
                         showlegend=True
                     )
-                    st.plotly_chart(fig_pie2, width='stretch')
+                    st.plotly_chart(fig_pie2, use_container_width=True)
                 else:
                     st.info("暂无数据")
         else:
@@ -872,7 +872,7 @@ def main_content():
             display_for_render = display_df_sorted.copy()
             display_for_render["DI 值"] = display_for_render["DI 值"].apply(lambda x: f"{x}")
             display_for_render["问题单数"] = display_for_render["问题单数"].apply(lambda x: f"{x}")
-            st.dataframe(display_for_render, hide_index=True, width='stretch', height=350)
+            st.dataframe(display_for_render, hide_index=True, use_container_width=True, height=350)
 
         st.divider()
 
@@ -971,7 +971,7 @@ def main_content():
         if cols_to_show:
             aggrid_table(df_display, cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
         else:
-            st.dataframe(df_display, hide_index=True, width='stretch')
+            st.dataframe(df_display, hide_index=True, use_container_width=True)
 
     else:
         st.info("👈 请先在左侧展开侧边栏，导入数据")
