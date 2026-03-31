@@ -127,9 +127,16 @@ class BugCrawler:
         assigned_domain = item.get("assigned_domain", {})
         assigned_to_domain = assigned_domain.get("title", "") if assigned_domain else ""
 
-        # 处理发现环境（优先使用 titleZh 中文，fallback 到 title）
+        # 处理发现环境（根据 category 映射为中文）
         discovered_env = item.get("discovered_environment", {}) or {}
-        discovered_environment = discovered_env.get("titleZh", "") or discovered_env.get("title", "")
+        env_category = discovered_env.get("category", "")
+        if env_category == "prod":
+            discovered_environment = "生产环境"
+        elif env_category == "dev":
+            discovered_environment = "非生产环境"
+        else:
+            # 其他情况尝试用 titleZh 或 title
+            discovered_environment = discovered_env.get("titleZh", "") or discovered_env.get("title", "")
 
         # 处理研发责任人（优先使用 current_owners，fallback 到 develop_owners）
         current_owners = item.get("current_owners", []) or []
