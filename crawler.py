@@ -127,13 +127,15 @@ class BugCrawler:
         assigned_domain = item.get("assigned_domain", {})
         assigned_to_domain = assigned_domain.get("title", "") if assigned_domain else ""
 
-        # 处理发现环境
-        discovered_env = item.get("discovered_environment", {})
-        discovered_environment = discovered_env.get("title", "") if discovered_env else ""
+        # 处理发现环境（优先使用 titleZh 中文，fallback 到 title）
+        discovered_env = item.get("discovered_environment", {}) or {}
+        discovered_environment = discovered_env.get("titleZh", "") or discovered_env.get("title", "")
 
-        # 处理研发责任人
+        # 处理研发责任人（优先使用 current_owners，fallback 到 develop_owners）
+        current_owners = item.get("current_owners", []) or []
         develop_owners = item.get("develop_owners", []) or []
-        dev_person = develop_owners[0].get("name", "") if develop_owners else ""
+        owners = current_owners if current_owners else develop_owners
+        dev_person = owners[0].get("name", "") if owners else ""
 
         # 处理测试责任人
         test_owners = item.get("test_owners", []) or []
