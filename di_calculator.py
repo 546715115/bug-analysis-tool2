@@ -91,9 +91,14 @@ def filter_production_issues(df: pd.DataFrame) -> pd.DataFrame:
 
 def is_delivery_excluded(delivery_scenario: str) -> bool:
     """判断交付场景是否排除 DI 计算"""
-    if pd.isna(delivery_scenario) or str(delivery_scenario).strip() == "":
-        return False  # 空 = 正常算
-    return str(delivery_scenario) in DELIVERY_EXCLUDED
+    try:
+        # 先转字符串处理
+        val = str(delivery_scenario).strip() if not pd.isna(delivery_scenario) else ""
+        if val == "" or val == "nan":
+            return False  # 空 = 正常算
+        return val in DELIVERY_EXCLUDED
+    except (ValueError, TypeError):
+        return False  # 解析失败，默认不算
 
 
 def should_count_di(status: str, stage: str, discovered_environment: str) -> Tuple[bool, str]:
