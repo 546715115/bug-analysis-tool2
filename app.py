@@ -714,7 +714,6 @@ def main_content():
                     st.session_state.show_export_dialog = True
 
         # 图表分析
-        st.markdown('<p style="font-size:1.2rem; font-weight:bold;">📊 图 表 分 析</p>', unsafe_allow_html=True)
 
         # 获取微服务列表（与微服务查看问题单详情一致）
         if "assigned_to_domain" in df_filtered.columns:
