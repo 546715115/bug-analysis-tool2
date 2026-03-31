@@ -124,8 +124,8 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         # 定位中/空 → 统计
         if status == "定位中" and stage == "":
             return True, "非生产-定位中"
-        # 待修复/空 → 统计
-        if status == "待修复" and stage == "":
+        # 修复/待修复 → 统计
+        if status == "修复" and stage == "待修复":
             return True, "非生产-待修复"
         # 修复/修复中 → 统计
         if status == "修复" and stage == "修复中":
@@ -162,8 +162,8 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         # 定位中/空 → 统计
         if status == "定位中" and stage == "":
             return True, "生产-定位中"
-        # 待修复/空 → 统计
-        if status == "待修复" and stage == "":
+        # 修复/待修复 → 统计
+        if status == "修复" and stage == "待修复":
             return True, "生产-待修复"
         # 修复/修复中 → 统计
         if status == "修复" and stage == "修复中":
