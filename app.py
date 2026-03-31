@@ -619,7 +619,6 @@ def main_content():
         st.subheader("☁️ 云服务 DI 概览")
 
         cloud_di_info = calculate_cloud_di(df_filtered)
-        st.write(f"DI调试: 总有效DI={cloud_di_info['di']}, debug={cloud_di_info.get('debug', {})}")
         ms_di_all = calculate_microservice_di_with_count(df_filtered)
         # 合格标准：云服务 DI < 20 且 所有微服务 DI < 5
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
