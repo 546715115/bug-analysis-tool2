@@ -2,28 +2,45 @@
 import time
 import requests
 import urllib3
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from config import BASE_URL, get_default_headers, build_auth_headers
 
 # 禁用 SSL 证书警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+# Status 映射
+STATUS_MAPPING = {
+    "ISSUE_STATUS_SUBMIT": "待提交",
+    "ISSUE_STATUS_ANALYSIS": "定位中",
+    "ISSUE_STATUS_FIXING": "修复",
+    "ISSUE_STATUS_VERIFYING": "待验收",
+    "ISSUE_STATUS_REGRESSION_TEST": "已关闭",
+    "ISSUE_STATUS_RETURNED": "待确认",
+}
+
+# Stage 映射
+STAGE_MAPPING = {
+    "ISSUE_STAGE_PLANNING": "待修复",
+    "ISSUE_STAGE_CODE": "修复中",
+    "ISSUE_STAGE_TEST": "修复测试",
+    "ISSUE_STAGE_DONE": "修复完成",
+}
+
+# Severity 映射
+SEVERITY_MAPPING = {
+    "04003001": "提示",
+    "04003002": "一般",
+    "04003003": "严重",
+    "04003004": "致命",
+}
+
 
 class BugCrawler:
     def __init__(self, auth_config: Dict[str, str], domain_ids: list = None):
         self.base_url = BASE_URL
         self.auth = auth_config
         self.session = requests.Session()
-        # 默认支持 domain 11 和 33921，可配置
         self.domain_ids = domain_ids or [11, 33921]
-
-    def fetch_all_domains(self) -> Optional[bytes]:
-        """爬取所有 domain 的数据并合并"""
-        all_data = []
-        for domain_id in self.domain_ids:
-            data = self.fetch_data(domain_id)
-            if data:
-                all_data.append(data)
-        return all_data if all_data else None
 
     def _get_headers(self) -> Dict[str, str]:
         """获取认证请求头"""
@@ -33,79 +50,125 @@ class BugCrawler:
             user_id=self.auth.get("x_titan_userid", "")
         )
 
-    def build_export_payload(self, domain_id: int, source_type: str = "with_assigned_domain") -> Dict:
-        """构建导出请求体"""
-        request_tag = str(int(time.time() * 1000))
-
-        base_conditions = {
+    def _build_payload(self, domain_id: int, page: int = 1, page_size: int = 100) -> Dict:
+        """构建查询请求体"""
+        return {
             "sorts": [
                 {"key": "updated_time", "value": "desc"},
                 {"key": "updated_time", "value": "desc"}
             ],
             "filters": [
-                {"key": "scene", "operator": "||", "value": ["issue_bug"]},
-                {"key": "current_domain", "operator": "||", "value": [domain_id]},
-                {"key": "status", "operator": "||", "value": [
-                    "ISSUE_STATUS_SUBMIT",
-                    "ISSUE_STATUS_ANALYSIS",
-                    "ISSUE_STATUS_FIXING",
-                    "ISSUE_STATUS_VERIFYING",
-                    "ISSUE_STATUS_REGRESSION_TEST",
-                    "ISSUE_STATUS_RETURNED"
-                ]},
-                {"key": "category", "operator": "||", "value": ["04000001", "04000002", "04000003"]}
+                {
+                    "key": "scene",
+                    "operator": "||",
+                    "value": ["issue_bug"]
+                },
+                {
+                    "key": "current_domain",
+                    "operator": "||",
+                    "value": [domain_id]
+                },
+                {
+                    "key": "status",
+                    "operator": "||",
+                    "value": [
+                        "ISSUE_STATUS_SUBMIT",
+                        "ISSUE_STATUS_ANALYSIS",
+                        "ISSUE_STATUS_FIXING",
+                        "ISSUE_STATUS_VERIFYING",
+                        "ISSUE_STATUS_REGRESSION_TEST",
+                        "ISSUE_STATUS_RETURNED"
+                    ]
+                },
+                {
+                    "key": "assigned_domain",
+                    "value": [
+                        {"id": domain_id, "type": "Domain"}
+                    ],
+                    "operator": "||",
+                    "convolution": "down"
+                },
+                {
+                    "key": "category",
+                    "operator": "||",
+                    "value": ["04000001", "04000002", "04000003"]
+                }
             ],
+            "pagination": {
+                "current_page": page,
+                "page_size": str(page_size)
+            },
             "with_children": True,
             "view": "receive",
-            "data_type": "tree"
+            "data_type": "tree",
+            "request_tag": int(time.time() * 1000)
         }
 
-        # 根据 source_type 决定是否带 assigned_domain
-        if source_type == "with_assigned_domain":
-            base_conditions["assigned_domain"] = {
-                "value": [{"id": domain_id, "type": "Domain"}],
-                "operator": "||",
-                "convolution": "down"
-            }
+    def _parse_issue(self, item: Dict) -> Dict:
+        """解析单条问题单数据"""
+        # 处理 status 和 stage
+        status = item.get("status", "")
+        stage = item.get("stage", "") or ""
+
+        # 获取 status 映射
+        status_text = STATUS_MAPPING.get(status, status)
+
+        # 如果是 FIXING 状态，需要结合 stage 确定具体状态
+        if status == "ISSUE_STATUS_FIXING" and stage:
+            stage_text = STAGE_MAPPING.get(stage, stage)
+            status_text = f"修复/{stage_text}"
+
+        # 处理 severity
+        severity_code = item.get("severity", "")
+        severity = SEVERITY_MAPPING.get(severity_code, severity_code)
+
+        # 处理责任服务
+        assigned_domain = item.get("assigned_domain", {})
+        assigned_to_domain = assigned_domain.get("title", "") if assigned_domain else ""
+
+        # 处理发现环境
+        discovered_env = item.get("discovered_environment", {})
+        discovered_environment = discovered_env.get("title", "") if discovered_env else ""
+
+        # 处理研发责任人
+        develop_owners = item.get("develop_owners", []) or []
+        dev_person = develop_owners[0].get("name", "") if develop_owners else ""
+
+        # 处理测试责任人
+        test_owners = item.get("test_owners", []) or []
+        test_owners_text = test_owners[0].get("name", "") if test_owners else ""
+
+        # 处理发现问题版本
+        from_version = item.get("fromVersion", {})
+        from_version_text = from_version.get("number", "") if from_version else ""
+
+        # 处理有效标志
+        valid = item.get("valid")
+        valid_text = "挂起" if valid == 0 else ("有效" if valid == 1 else "")
 
         return {
-            "source_id": domain_id,
-            "source_title": "Cloud Eye",
-            "source_type": "Domain",
-            "language": "zh",
-            "exportSize": 120,
-            "conditions": base_conditions,
-            "select": [
-                "number", "title", "valid", "found_in_domain", "discovered_environment",
-                "assigned_to_domain", "repair_plan", "raised_by", "head_owner",
-                "current_owner", "discovered_stage", "severity_level", "online_sources",
-                "stage", "status", "discovered_time", "discover_iteration", "labels",
-                "issue_closed_way", "testOwners", "root_cause", "operate_record",
-                "created_time", "ISSUE_STATUS_SUBMIT", "ISSUE_STATUS_ANALYSIS",
-                "ISSUE_STAGE_PLANNING", "ISSUE_STATUS_FIXING", "ISSUE_STAGE_CODE",
-                "ISSUE_STAGE_TEST", "ISSUE_STAGE_DONE", "ISSUE_STATUS_VERIFYING",
-                "ISSUE_STATUS_RETURNED", "remark"
-            ],
-            "request_tag": request_tag,
-            "fieldId": [1, 2, 4, 5, 6, 7, 264, 9, 11, 12, 14, 15, 17, 18, 19, 24, 263, 27, 34, 268, 67, 68, 48, 39, 40, 41, 42, 43, 44, 45, 46, 47, 474]
+            "number": item.get("number", ""),
+            "title": item.get("title", ""),
+            "severity_level": severity,
+            "status": status_text,
+            "stage": stage,
+            "assigned_to_domain": assigned_to_domain,
+            "from_version": from_version_text,
+            "discover_iteration": item.get("iteration", ""),
+            "created_time": item.get("created_time", ""),
+            "discovered_time": item.get("updated_time", ""),  # 使用 updated_time 作为 discovered_time
+            "delivery_scenario": item.get("deliveryScenario", ""),
+            "valid": valid_text,
+            "discovered_environment": discovered_environment,
+            "labels": ",".join([lbl.get("name", "") for lbl in item.get("labels", []) if lbl]),
+            "dev_person": dev_person,
+            "testOwners": test_owners_text,
         }
 
-    def trigger_export(self, domain_id: int, source_type: str = "with_assigned_domain") -> Optional[int]:
-        """触发导出，返回 file_id"""
-        # 每次 export 前都先调用 GET 接口（浏览器行为）
-        config_url = f"{self.base_url}/vision-excel/api/query/issue/download_item?domain_id={domain_id}&requestTag={int(time.time() * 1000)}"
-        try:
-            self.session.get(config_url, headers=self._get_headers(), timeout=30, verify=False)
-            print(f"[Domain {domain_id}] GET download_item 完成")
-        except Exception:
-            pass
-
-        url = f"{self.base_url}/vision-excel/api/export/issue/v2?requestTag={int(time.time() * 1000)}"
-        payload = self.build_export_payload(domain_id, source_type)
-
-        # 打印关键参数
-        has_assigned = "assigned_domain" in payload.get("conditions", {})
-        print(f"[Domain {domain_id}] 导出请求: source_type={source_type}, has_assigned_domain={has_assigned}")
+    def fetch_page(self, domain_id: int, page: int = 1, page_size: int = 100) -> Optional[Dict]:
+        """查询单页数据"""
+        url = f"{self.base_url}/vision-defect-management/api/query/issues"
+        payload = self._build_payload(domain_id, page, page_size)
 
         try:
             response = self.session.post(
@@ -117,85 +180,58 @@ class BugCrawler:
             )
 
             if response.status_code != 200:
-                print(f"[Domain {domain_id}] export 失败: HTTP {response.status_code}")
+                print(f"[Domain {domain_id}] 请求失败: HTTP {response.status_code}")
                 return None
 
             data = response.json()
             if data.get("code") == 200:
-                file_id = data.get("data", {}).get("id")
-                print(f"[Domain {domain_id}] export 成功: file_id={file_id}")
-                return file_id
-            print(f"[Domain {domain_id}] export 失败: {data}")
+                return data.get("data", {})
+            print(f"[Domain {domain_id}] 查询失败: {data}")
             return None
         except Exception as e:
-            print(f"[Domain {domain_id}] export 异常: {e}")
+            print(f"[Domain {domain_id}] 查询异常: {e}")
             return None
 
-    def query_file_status(self, file_id: int) -> Optional[str]:
-        """查询文件状态"""
-        url = f"{self.base_url}/vision-excel/api/query/file_download_record?requestTag={int(time.time() * 1000)}"
+    def fetch_all_data(self, domain_id: int) -> Optional[List[Dict]]:
+        """查询单个 domain 的所有数据（分页）"""
+        all_issues = []
+        page = 1
+        page_size = 100
+        total_records = 0
 
-        try:
-            response = self.session.post(
-                url,
-                json={"filters": [{"key": "id", "operator": "||", "value": [file_id]}]},
-                headers=self._get_headers(),
-                timeout=30,
-                verify=False
-            )
-            data = response.json()
+        while True:
+            result_data = self.fetch_page(domain_id, page, page_size)
+            if not result_data:
+                break
 
-            if data.get("code") == 200:
-                result = data.get("data", {}).get("result", [])
-                if result:
-                    status = result[0].get("status")
-                    print(f"[文件 {file_id}] 状态: {status}")
-                    return status
-            print(f"[文件 {file_id}] 查询失败: {data}")
-            return None
-        except Exception as e:
-            print(f"[文件 {file_id}] 查询异常: {e}")
-            return None
+            result_list = result_data.get("result", [])
+            pagination = {
+                "total_records": result_data.get("total_records", 0),
+                "total_pages": result_data.get("total_pages", 1),
+                "current_page": result_data.get("current_page", 1),
+            }
 
-    def download_file(self, file_id: int, domain_id: int = 11) -> Optional[bytes]:
-        """下载 Excel 文件"""
-        url = f"{self.base_url}/vision-excel/api/download/workitem?id={file_id}"
-        print(f"[文件 {file_id}] 下载 URL: {url}")
-        try:
-            response = self.session.get(
-                url,
-                headers=self._get_headers(),
-                timeout=60,
-                verify=False
-            )
-            print(f"[文件 {file_id}] 状态码: {response.status_code}, 大小: {len(response.content)}")
-            # 200 和 201 都是成功响应
-            if response.status_code in (200, 201) and not response.content.startswith(b'<'):
-                return response.content
-            print(f"[文件 {file_id}] 响应前100字节: {response.content[:100]}")
-            return None
-        except Exception as e:
-            print(f"[文件 {file_id}] 异常: {e}")
-            return None
+            if page == 1:
+                total_records = pagination["total_records"]
+                print(f"[Domain {domain_id}] 总记录数: {total_records}, 总页数: {pagination['total_pages']}")
 
-    def wait_and_download(self, file_id: int, domain_id: int = 11, timeout: int = 120) -> Optional[bytes]:
-        """轮询等待文件就绪后下载"""
-        start_time = time.time()
+            for item in result_list:
+                parsed = self._parse_issue(item)
+                all_issues.append(parsed)
 
-        while time.time() - start_time < timeout:
-            status = self.query_file_status(file_id)
+            if page >= pagination["total_pages"]:
+                break
 
-            if status == "FILE_STATUS_GENERATED":
-                return self.download_file(file_id, domain_id)
+            page += 1
 
-            time.sleep(3)
+        print(f"[Domain {domain_id}] 获取到 {len(all_issues)} 条数据")
+        return all_issues if all_issues else None
 
-        return None
-
-    def fetch_data(self, domain_id: int = 11, source_type: str = "with_assigned_domain") -> Optional[bytes]:
-        """完整流程：触发导出 → 等待 → 下载"""
-        file_id = self.trigger_export(domain_id, source_type)
-        if not file_id:
-            return None
-
-        return self.wait_and_download(file_id, domain_id)
+    def fetch_all_domains(self) -> Optional[List[Dict]]:
+        """爬取所有 domain 的数据并合并"""
+        all_data = []
+        for domain_id in self.domain_ids:
+            domain_data = self.fetch_all_data(domain_id)
+            if domain_data:
+                all_data.extend(domain_data)
+        return all_data if all_data else None
