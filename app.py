@@ -389,14 +389,27 @@ def render_sidebar():
                         all_data = crawler.fetch_all_domains()
 
                         if all_data:
-                            df_raw = pd.DataFrame(all_data)
-                            print(f"获取到 {len(df_raw)} 条数据")
-                            st.session_state.df_raw = df_raw
-                            st.session_state.versions = get_version_list(df_raw)
-                            st.session_state.selected_version = "全部"
-                            st.success(f"成功获取 {len(df_raw)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
-                            st.session_state.sidebar_collapsed = True
-                            st.rerun()
+                            # API 数据转为 DataFrame
+                            df_api = pd.DataFrame(all_data)
+                            print(f"API 获取到 {len(df_api)} 条数据")
+
+                            # 与 Excel 数据保持一致的处理链路
+                            # 1. merge_data 处理（API 单数据源，传一个空 DataFrame 作为 df1）
+                            merged = merge_data(pd.DataFrame(), df_api)
+                            print(f"merge_data 后: {len(merged)} 条")
+
+                            # 2. normalize_columns 列名标准化
+                            merged = normalize_columns(merged)
+
+                            if not merged.empty:
+                                st.session_state.df_raw = merged
+                                st.session_state.versions = get_version_list(merged)
+                                st.session_state.selected_version = "全部"
+                                st.success(f"成功获取 {len(merged)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
+                                st.session_state.sidebar_collapsed = True
+                                st.rerun()
+                            else:
+                                st.error("获取数据失败，请检查认证信息或 API 参数")
                         else:
                             st.error("获取数据失败，请检查认证信息或 API 参数")
 
