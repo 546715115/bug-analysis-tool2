@@ -173,9 +173,9 @@ class BugCrawler:
         from_version = item.get("fromVersion", {}) or {}
         from_version_text = from_version.get("title", "") or from_version.get("number", "")
 
-        # 处理有效标志（从 extendattrs 中获取）
-        extendattrs = item.get("extendattrs", {}) or {}
-        valid = extendattrs.get("valid")
+        # 处理有效标志（优先从 extendattrs 获取，否则从顶层获取）
+        extendattrs = item.get("extendattrs") or {}
+        valid = extendattrs.get("valid") if extendattrs else item.get("valid")
         valid_text = "挂起" if valid == 0 else ("有效" if valid == 1 else "")
 
         return {
