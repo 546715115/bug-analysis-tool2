@@ -271,12 +271,13 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
 
 def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     """
-    计算单个问题单的 DI 值
+    计算单条问题单的 DI 值
 
     规则：
-    1. 判断是否统计 DI（根据 status + stage + discovered_environment）
-    2. 判断是否 SLA 超期（当前时间 - 发现时间 > 阈值）
-    3. 判断交付场景（HCS 不算）
+    1. should_count_di：status + stage + environment 判断
+    2. 交付场景判断（HCS 排除）
+    3. 生产环境：直接返回 severity_di（不看 SLA）
+    4. 非生产环境：判断 SLA 是否超期
     """
     severity = row.get("severity_level", "")
     status = row.get("status", "")
@@ -286,10 +287,11 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     delivery_scenario = row.get("delivery_scenario", "")
     number = row.get("number", "")
 
-    # 1. 判断是否应该统计
+    is_prod = str(discovered_env).strip() == "生产环境"
+
+    # 1. Stage/Status 判断
     should_count, reason = should_count_di(status, stage, discovered_env)
     if not should_count:
-        # 追踪"其他"分支的记录
         if "其他" in reason:
             _di_debug.add_di_zero(number, reason, status, stage, discovered_env)
         return 0.0
@@ -300,25 +302,26 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
         _di_debug.add_di_zero(number, "交付场景排除", status, stage, discovered_env)
         return 0.0
 
-    # 3. SLA 超期判断
-    threshold = get_sla_threshold(severity)
+    # 3. 严重程度
     severity_di = get_severity_di(severity)
-
-    # 如果严重程度映射失败（返回0），记录
     if severity_di == 0:
         _di_debug.add_severity_failure(number, severity)
+        _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
+        return 0.0
 
-    # 如果没有发现时间，无法判断 SLA，默认按超期处理（算 DI）
-    if pd.isna(discovered_time) or str(discovered_time).strip() == "":
-        # 无法判断 SLA，默认算 DI
-        if severity_di == 0:
-            _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
+    # 4. 生产环境：不看 SLA，直接返回 severity_di
+    if is_prod:
         return severity_di
 
-    # 解析发现时间
+    # 5. 非生产环境：判断 SLA
+    threshold = get_sla_threshold(severity)
+
+    if pd.isna(discovered_time) or str(discovered_time).strip() == "":
+        # 无发现时间，默认超期
+        return severity_di
+
     try:
         if isinstance(discovered_time, str):
-            # 尝试解析字符串时间
             discovered_dt = pd.to_datetime(discovered_time)
         else:
             discovered_dt = discovered_time
@@ -326,18 +329,13 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
         days_elapsed = (current_time - discovered_dt).total_seconds() / (24 * 3600)
 
         if days_elapsed > threshold:
-            if severity_di == 0:
-                _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
             return severity_di
         else:
-            # SLA 未超期
             _di_debug.add_sla_not_exceeded(number, days_elapsed, threshold)
             _di_debug.add_di_zero(number, "SLA未超期", status, stage, discovered_env)
             return 0.0
     except Exception:
-        # 解析失败，默认算 DI
-        if severity_di == 0:
-            _di_debug.add_di_zero(number, "时间解析失败", status, stage, discovered_env)
+        # 解析失败，默认超期
         return severity_di
 
 
