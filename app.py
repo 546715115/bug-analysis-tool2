@@ -693,9 +693,14 @@ def main_content():
 
     # 主页面
     if not st.session_state.df_raw.empty:
-        # 数据预处理
+        # 原始数据（不过滤ccb）
+        df_all_nofilter = st.session_state.df_raw.copy()
+
+        # 应用ccb过滤，用于后续分析
         df_all = filter_production_issues(st.session_state.df_raw)
 
+        # 按版本过滤（不过滤ccb）
+        df_filtered_nofilter = filter_by_version(df_all_nofilter, st.session_state.selected_version)
         # 按版本过滤（云服务概览使用过滤后的数据）
         df_filtered = filter_by_version(df_all, st.session_state.selected_version)
 
@@ -732,8 +737,10 @@ def main_content():
                     st.markdown(f"<span style='font-size: 1em; display:flex; align-items:center; height:100%;'>{badge_html}</span>", unsafe_allow_html=True)
         else:
             st.info("暂无可用的版本数据")
-
-        cloud_di_info = calculate_cloud_di(df_filtered)
+        # 计算包含ccb挂起的数据
+        cloud_di_info_without_ccb = calculate_cloud_di(df_filtered_nofilter, include_ccb=True)
+        # 计算不包含ccb挂起的数据
+        cloud_di_info = calculate_cloud_di(df_filtered, include_ccb=True)
         ms_di_all = calculate_microservice_di_with_count(df_filtered)
         # 合格标准：云服务 DI < 20 且 所有微服务 DI < 5
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
@@ -742,7 +749,7 @@ def main_content():
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("云服务", "Cloud Eye")
         col2.metric("总有效DI值", cloud_di_info["di"])
-        col3.metric("总问题单", cloud_di_info["issue_count"])
+        col3.metric("总问题单", cloud_di_info_without_ccb["issue_count"])
 
         # 合格标准和导出按钮都在第四列
         with col4:

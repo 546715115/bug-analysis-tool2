@@ -239,18 +239,30 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
         return get_severity_di(severity)
 
 
-def calculate_cloud_di(df: pd.DataFrame) -> Dict:
+def calculate_cloud_di(df: pd.DataFrame,include_ccb: bool =False) -> Dict:
     """计算云服务级别 DI"""
     if df.empty:
         return {"di": 0, "issue_count": 0, "qualified": True, "debug": {"di_0": 0, "di_gt_0": 0}}
+    # 根据参数决定是否ccb过滤
+    if include_ccb:
+        work_df = df    # 包含ccb挂起，不过滤
+    else:
+        work_df = filter_production_issues(df)  # 应用ccb过滤
 
-    # 只保留 CES 微服务计算 DI
+
+    # 只保留CES微服务计算DI
     ces_df = df[df["assigned_to_domain"].apply(is_microservice)].copy()
 
     current_time = datetime.now()
     total_di = 0
     issue_count = len(df)  # 总问题单统计所有数据
     debug_counts = {"di_0": 0, "di_gt_0": 0}
+
+    # 关键修改，根据参数决定总问题统计方式
+    if  include_ccb:
+        issue_count = len(df)   # 使用原始数据（包含ccb）
+    else:
+        issue_count = len(work_df)  # 使用过滤数据
 
     for _, row in ces_df.iterrows():
         di = calculate_di_for_issue(row, current_time)

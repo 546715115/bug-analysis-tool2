@@ -187,7 +187,7 @@ class BugCrawler:
             "from_version": from_version_text,
             "discover_iteration": item.get("iteration", ""),
             "created_time": item.get("created_time", ""),
-            "discovered_time": item.get("updated_time", ""),  # 使用 updated_time 作为 discovered_time
+            "discovered_time": item.get("created_time", ""),  # 使用 updated_time 作为 discovered_time
             "delivery_scenario": item.get("deliveryScenario", ""),
             "valid": valid_text,
             "discovered_environment": discovered_environment,
