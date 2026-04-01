@@ -299,14 +299,14 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     # 2. 交付场景判断
     if is_delivery_excluded(delivery_scenario):
         _di_debug.add_delivery_excluded(number, delivery_scenario)
-        _di_debug.add_di_zero(number, "交付场景排除", status, stage, discovered_env)
+        _di_debug.add_di_zero(number, f"{reason}|交付场景排除", status, stage, discovered_env)
         return 0.0
 
     # 3. 严重程度
     severity_di = get_severity_di(severity)
     if severity_di == 0:
         _di_debug.add_severity_failure(number, severity)
-        _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
+        _di_debug.add_di_zero(number, f"{reason}|严重程度映射失败({severity})", status, stage, discovered_env)
         return 0.0
 
     # 4. 生产环境：不看 SLA，直接返回 severity_di
@@ -332,7 +332,7 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
             return severity_di
         else:
             _di_debug.add_sla_not_exceeded(number, days_elapsed, threshold)
-            _di_debug.add_di_zero(number, "SLA未超期", status, stage, discovered_env)
+            _di_debug.add_di_zero(number, f"{reason}|SLA未超期({round(days_elapsed,1)}天<{threshold}天)", status, stage, discovered_env)
             return 0.0
     except Exception:
         # 解析失败，默认超期
