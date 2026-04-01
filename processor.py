@@ -13,7 +13,7 @@ FIELD_MAPPING = {
     "assigned_to_domain": ["责任服务", "负责域"],
     "from_version": ["发现问题版本"],
     "discover_iteration": ["发现迭代"],
-    "created_time": ["创建时间"],
+    "created_time": ["问题创建时间"],
     "stage": ["问题阶段"],
     "discovered_time": ["发现时间"],
     "delivery_scenario": ["交付场景"],
