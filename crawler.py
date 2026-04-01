@@ -41,6 +41,7 @@ class BugCrawler:
         self.auth = auth_config
         self.session = requests.Session()
         self.domain_ids = domain_ids or [11, 33921]
+        self.debug_first_item = None  # 存储第一条原始数据用于调试
 
     def _get_headers(self) -> Dict[str, str]:
         """获取认证请求头"""
@@ -106,6 +107,10 @@ class BugCrawler:
 
     def _parse_issue(self, item: Dict) -> Dict:
         """解析单条问题单数据"""
+        # Debug: 存储第一条原始数据用于页面显示
+        if self.debug_first_item is None:
+            self.debug_first_item = item.copy()
+
         # 处理 status 和 stage
         api_status = item.get("status", "")
         api_stage = item.get("stage", "") or ""
