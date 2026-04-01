@@ -298,6 +298,76 @@ def filter_by_di_rules(df: pd.DataFrame) -> pd.DataFrame:
     return df_result
 
 
+def get_data_stats_summary(df: pd.DataFrame, df_di_filtered: pd.DataFrame) -> dict:
+    """
+    获取数据统计摘要，用于DI计算调试
+    返回统计信息的字典
+    """
+    if df.empty:
+        return {}
+
+    stats = {
+        "总记录数": len(df),
+        "状态分布": df["status"].value_counts().to_dict() if "status" in df.columns else {},
+        "stage分布": df["stage"].value_counts().to_dict() if "stage" in df.columns else {},
+        "环境分布": df["discovered_environment"].value_counts().to_dict() if "discovered_environment" in df.columns else {},
+        "valid分布": df["valid"].value_counts().to_dict() if "valid" in df.columns else {},
+        "DI>0记录数": len(df_di_filtered) if not df_di_filtered.empty else 0,
+        "DI=0记录数": len(df) - len(df_di_filtered) if not df_di_filtered.empty else 0,
+    }
+    return stats
+
+
+def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di_filtered: pd.DataFrame):
+    """
+    在页面上显示DI计算调试信息（统计摘要）
+    """
+    with st.expander("🔍 DI计算调试信息", expanded=False):
+        # CCB过滤前数据统计
+        st.write("**📊 CCB过滤前数据统计:**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.write("状态分布:")
+            for k, v in df_all["status"].value_counts().items():
+                st.write(f"  · {k}: {v}")
+        with col2:
+            st.write("环境分布:")
+            for k, v in df_all["discovered_environment"].value_counts().items():
+                st.write(f"  · {k}: {v}")
+        with col3:
+            st.write("valid分布:")
+            for k, v in df_all["valid"].value_counts().items():
+                st.write(f"  · {k}: {v}")
+
+        st.write("")
+
+        # 版本过滤后数据统计
+        st.write(f"**📊 版本过滤后数据统计 ({st.session_state.selected_version}):**")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.write("状态分布:")
+            for k, v in df_filtered["status"].value_counts().items():
+                st.write(f"  · {k}: {v}")
+        with col2:
+            st.write("stage分布:")
+            stage_counts = df_filtered["stage"].value_counts()
+            for k, v in stage_counts.items():
+                st.write(f"  · [{k}]: {v}")
+        with col3:
+            st.write("环境分布:")
+            for k, v in df_filtered["discovered_environment"].value_counts().items():
+                st.write(f"  · {k}: {v}")
+
+        st.write("")
+
+        # DI计算结果统计
+        st.write(f"**📊 DI计算结果统计:**")
+        di_count = len(df_di_filtered) if not df_di_filtered.empty else 0
+        not_di_count = len(df_filtered) - di_count
+        st.write(f"  · DI>0（参与统计）: **{di_count}** 条")
+        st.write(f"  · DI=0（不参与统计）: **{not_di_count}** 条")
+
+
 def export_to_excel(df: pd.DataFrame, filename: str):
     """导出 DataFrame 为 Excel 文件，带表头筛选功能，列名转中文"""
     output = BytesIO()
@@ -928,6 +998,9 @@ def main_content():
 
         # 按 DI 规则过滤
         df_di_filtered = filter_by_di_rules(df_filtered)
+
+        # 显示DI计算调试信息（统计摘要）
+        display_di_debug_info(df_all, df_filtered, df_di_filtered)
 
         # 英文到中文的显示映射（与 EN_TO_CN_MAPPING 保持一致）
         en_to_cn_display = {
