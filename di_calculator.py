@@ -313,7 +313,13 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     if is_prod:
         return severity_di
 
-    # 5. 非生产环境：判断 SLA
+    # 5. 非生产环境：只有 修复(xxx)/待验收 需要判断 SLA
+    # 待提交/待确认/定位中/已关闭 不走 SLA
+    skip_sla_statuses = {"待提交", "待确认", "定位中", "已关闭"}
+    if status.strip() in skip_sla_statuses:
+        return severity_di
+
+    # 6. 需要走 SLA 的记录
     threshold = get_sla_threshold(severity)
 
     if pd.isna(discovered_time) or str(discovered_time).strip() == "":
