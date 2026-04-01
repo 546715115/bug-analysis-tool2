@@ -175,7 +175,7 @@ class BugCrawler:
 
         # 处理有效标志
         valid = item.get("valid")
-        valid_text = "挂起" if valid == -2 else ("撤销" if valid == -3 else ("有效" if valid == 0 else ""))
+        valid_text = "挂起" if valid == -2 else ("有效" if valid in [0, 1, -3] else "")
 
         return {
             "number": item.get("number", ""),
