@@ -115,6 +115,10 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
     stage = str(stage).strip() if not pd.isna(stage) else ""
     env = str(discovered_environment).strip() if not pd.isna(discovered_environment) else ""
 
+    # Debug: 打印"其他"分支的原始值
+    def debug_other(prefix, s, st, e):
+        print(f"[DEBUG OTHER] {prefix}: status=[{s}], stage=[{st}], env=[{e}]")
+
     # 非生产环境：除了"生产环境"之外，其他都是非生产环境
     if env != "生产环境":
         # 待提交/空 → 不统计
@@ -145,6 +149,7 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         if status == "待验收" and stage == "":
             return True, "非生产-待验收"
         # 其他情况 → 不统计
+        debug_other("非生产", status, stage, env)
         return False, "非生产-其他"
 
     # 生产环境
@@ -177,6 +182,7 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         if status == "修复" and stage == "修复测试":
             return True, "生产-修复测试"
         # 其他情况 → 不统计
+        debug_other("生产", status, stage, env)
         return False, "生产-其他"
 
     # 环境为空或其他未知情况
