@@ -2,29 +2,65 @@
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Tuple, List
+from collections import defaultdict
 
-# 调试用：存储"其他"分支的记录
-_other_cases: List[Dict] = []
+# 调试用：存储详细DI计算过程
+class DIDebugInfo:
+    _instance = None
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.reason_counts = defaultdict(int)  # should_count_di各原因计数
+        self.delivery_excluded = []  # delivery场景被排除的记录
+        self.severity_failures = []  # severity映射失败的记录
+        self.sla_not_exceeded = []  # SLA未超期的记录
+        self.di_zero_records = []  # DI=0的记录及原因
+
+    def add_reason(self, reason: str):
+        self.reason_counts[reason] += 1
+
+    def add_delivery_excluded(self, number: str, delivery_scenario: str):
+        self.delivery_excluded.append({"number": number, "delivery": delivery_scenario})
+
+    def add_severity_failure(self, number: str, severity: str):
+        self.severity_failures.append({"number": number, "severity": severity})
+
+    def add_sla_not_exceeded(self, number: str, days: float, threshold: int):
+        self.sla_not_exceeded.append({"number": number, "days": round(days, 1), "threshold": threshold})
+
+    def add_di_zero(self, number: str, reason: str, status: str, stage: str, env: str):
+        self.di_zero_records.append({
+            "number": number,
+            "reason": reason,
+            "status": status,
+            "stage": stage,
+            "env": env
+        })
+
+    def get_summary(self) -> Dict:
+        return {
+            "reason_counts": dict(self.reason_counts),
+            "delivery_excluded_count": len(self.delivery_excluded),
+            "severity_failure_count": len(self.severity_failures),
+            "sla_not_exceeded_count": len(self.sla_not_exceeded),
+            "di_zero_count": len(self.di_zero_records),
+        }
+
+# 全局实例
+_di_debug = DIDebugInfo()
 
 
-def get_other_cases() -> List[Dict]:
-    """获取并清空其他分支记录"""
-    global _other_cases
-    cases = _other_cases.copy()
-    _other_cases = []
-    return cases
+def reset_di_debug():
+    """重置调试信息"""
+    global _di_debug
+    _di_debug.reset()
 
 
-def _add_other_case(number: str, status: str, stage: str, env: str, reason: str):
-    """记录其他分支的案例"""
-    global _other_cases
-    _other_cases.append({
-        "number": number,
-        "status": status,
-        "stage": stage,
-        "env": env,
-        "reason": reason
-    })
+def get_di_debug_info() -> DIDebugInfo:
+    """获取调试信息（不重置）"""
+    return _di_debug
 
 # DI 权重配置
 SEVERITY_DI = {
@@ -132,6 +168,7 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         (should_count, reason)
     """
     if pd.isna(status):
+        _di_debug.add_reason("status为空")
         return False, "status为空"
 
     status = str(status).strip()
@@ -142,71 +179,93 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
     if env != "生产环境":
         # 待提交/空 → 不统计
         if status == "待提交" and stage == "":
+            _di_debug.add_reason("非生产-待提交")
             return False, "非生产-待提交"
         # 已关闭/空 → 不统计
         if status == "已关闭" and stage == "":
+            _di_debug.add_reason("非生产-已关闭")
             return False, "非生产-已关闭"
         # 待确认/空 → 统计
         if status == "待确认" and stage == "":
+            _di_debug.add_reason("非生产-待确认")
             return True, "非生产-待确认"
         # 定位中/空 → 统计
         if status == "定位中" and stage == "":
+            _di_debug.add_reason("非生产-定位中")
             return True, "非生产-定位中"
         # 修复/待修复 → 统计
         if status == "修复" and stage == "待修复":
+            _di_debug.add_reason("非生产-待修复")
             return True, "非生产-待修复"
         # 修复/修复中 → 统计
         if status == "修复" and stage == "修复中":
+            _di_debug.add_reason("非生产-修复中")
             return True, "非生产-修复中"
         # 修复/修复测试 → 统计
         if status == "修复" and stage == "修复测试":
+            _di_debug.add_reason("非生产-修复测试")
             return True, "非生产-修复测试"
         # 修复/修复完成 → 统计
         if status == "修复" and stage == "修复完成":
+            _di_debug.add_reason("非生产-修复完成")
             return True, "非生产-修复完成"
         # 待验收/空 → 统计
         if status == "待验收" and stage == "":
+            _di_debug.add_reason("非生产-待验收")
             return True, "非生产-待验收"
         # 其他情况 → 不统计
+        _di_debug.add_reason("非生产-其他")
         return False, "非生产-其他"
 
     # 生产环境
     if env == "生产环境":
         # 待提交/空 → 不统计
         if status == "待提交" and stage == "":
+            _di_debug.add_reason("生产-待提交")
             return False, "生产-待提交"
         # 待验收/空 → 不统计
         if status == "待验收" and stage == "":
+            _di_debug.add_reason("生产-待验收")
             return False, "生产-待验收"
         # 已关闭/空 → 不统计
         if status == "已关闭" and stage == "":
+            _di_debug.add_reason("生产-已关闭")
             return False, "生产-已关闭"
         # 修复/修复完成 → 不统计
         if status == "修复" and stage == "修复完成":
+            _di_debug.add_reason("生产-修复完成")
             return False, "生产-修复完成"
         # 待确认/空 → 统计
         if status == "待确认" and stage == "":
+            _di_debug.add_reason("生产-待确认")
             return True, "生产-待确认"
         # 定位中/空 → 统计
         if status == "定位中" and stage == "":
+            _di_debug.add_reason("生产-定位中")
             return True, "生产-定位中"
         # 修复/待修复 → 统计
         if status == "修复" and stage == "待修复":
+            _di_debug.add_reason("生产-待修复")
             return True, "生产-待修复"
         # 修复/修复中 → 统计
         if status == "修复" and stage == "修复中":
+            _di_debug.add_reason("生产-修复中")
             return True, "生产-修复中"
         # 修复/修复测试 → 统计
         if status == "修复" and stage == "修复测试":
+            _di_debug.add_reason("生产-修复测试")
             return True, "生产-修复测试"
         # 其他情况 → 不统计
+        _di_debug.add_reason("生产-其他")
         return False, "生产-其他"
 
     # 环境为空或其他未知情况
     # 已关闭状态，无论环境如何都不统计
     if status == "已关闭":
+        _di_debug.add_reason("环境未知-已关闭")
         return False, "环境未知-已关闭"
     # 其他状态，环境未知时默认统计
+    _di_debug.add_reason("环境未知-统计")
     return True, "环境未知-统计"
 
 
@@ -232,20 +291,29 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     if not should_count:
         # 追踪"其他"分支的记录
         if "其他" in reason:
-            _add_other_case(number, status, stage, discovered_env, reason)
+            _di_debug.add_di_zero(number, reason, status, stage, discovered_env)
         return 0.0
 
     # 2. 交付场景判断
     if is_delivery_excluded(delivery_scenario):
+        _di_debug.add_delivery_excluded(number, delivery_scenario)
+        _di_debug.add_di_zero(number, "交付场景排除", status, stage, discovered_env)
         return 0.0
 
     # 3. SLA 超期判断
     threshold = get_sla_threshold(severity)
+    severity_di = get_severity_di(severity)
+
+    # 如果严重程度映射失败（返回0），记录
+    if severity_di == 0:
+        _di_debug.add_severity_failure(number, severity)
 
     # 如果没有发现时间，无法判断 SLA，默认按超期处理（算 DI）
     if pd.isna(discovered_time) or str(discovered_time).strip() == "":
         # 无法判断 SLA，默认算 DI
-        return get_severity_di(severity)
+        if severity_di == 0:
+            _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
+        return severity_di
 
     # 解析发现时间
     try:
@@ -258,12 +326,19 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
         days_elapsed = (current_time - discovered_dt).total_seconds() / (24 * 3600)
 
         if days_elapsed > threshold:
-            return get_severity_di(severity)
+            if severity_di == 0:
+                _di_debug.add_di_zero(number, "严重程度映射失败", status, stage, discovered_env)
+            return severity_di
         else:
-            return 0.0  # SLA 未超期
+            # SLA 未超期
+            _di_debug.add_sla_not_exceeded(number, days_elapsed, threshold)
+            _di_debug.add_di_zero(number, "SLA未超期", status, stage, discovered_env)
+            return 0.0
     except Exception:
         # 解析失败，默认算 DI
-        return get_severity_di(severity)
+        if severity_di == 0:
+            _di_debug.add_di_zero(number, "时间解析失败", status, stage, discovered_env)
+        return severity_di
 
 
 def calculate_cloud_di(df: pd.DataFrame,include_ccb: bool =False) -> Dict:

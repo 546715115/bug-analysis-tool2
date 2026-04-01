@@ -8,11 +8,12 @@ import plotly.express as px
 from config import build_auth_headers
 from crawler import BugCrawler
 from processor import load_excel, merge_data, normalize_columns, get_version_list, filter_by_version, get_chart_data
-from cache import save_cache, load_cache, list_caches, delete_cache
 from di_calculator import (
     calculate_cloud_di, calculate_microservice_di, calculate_microservice_di_with_count,
-    filter_production_issues, get_issue_detail_url, is_microservice, get_other_cases
+    filter_production_issues, get_issue_detail_url, is_microservice,
+    get_di_debug_info, reset_di_debug
 )
+from cache import save_cache, load_cache, list_caches, delete_cache
 from styles import apply_custom_styles, render_qualified_badge
 
 try:
@@ -318,65 +319,93 @@ def get_data_stats_summary(df: pd.DataFrame, df_di_filtered: pd.DataFrame) -> di
     return stats
 
 
-def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di_filtered: pd.DataFrame, other_cases: list = None):
+def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di_filtered: pd.DataFrame):
     """
-    在页面上显示DI计算调试信息（统计摘要）
+    在页面上显示DI计算调试信息（基于DIDebugInfo全局实例）
     """
-    if other_cases is None:
-        other_cases = []
+    # 获取debug信息
+    debug_info = get_di_debug_info()
+    summary = debug_info.get_summary()
+
     with st.expander("🔍 DI计算调试信息", expanded=False):
-        # CCB过滤前数据统计
-        st.write("**📊 CCB过滤前数据统计:**")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.write("状态分布:")
-            for k, v in df_all["status"].value_counts().items():
-                st.write(f"  · {k}: {v}")
-        with col2:
-            st.write("环境分布:")
-            for k, v in df_all["discovered_environment"].value_counts().items():
-                st.write(f"  · {k}: {v}")
-        with col3:
-            st.write("valid分布:")
-            for k, v in df_all["valid"].value_counts().items():
-                st.write(f"  · {k}: {v}")
+        # ========== 1. should_count_di 原因统计 ==========
+        st.write("**📊 should_count_di 原因统计:**")
+        reason_counts = summary.get("reason_counts", {})
+        if reason_counts:
+            # 按计数排序显示
+            sorted_reasons = sorted(reason_counts.items(), key=lambda x: -x[1])
+            for reason, count in sorted_reasons:
+                st.write(f"  · {reason}: **{count}** 条")
+        else:
+            st.write("  （无数据）")
 
         st.write("")
 
-        # 版本过滤后数据统计
-        st.write(f"**📊 版本过滤后数据统计 ({st.session_state.selected_version}):**")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.write("状态分布:")
-            for k, v in df_filtered["status"].value_counts().items():
-                st.write(f"  · {k}: {v}")
-        with col2:
-            st.write("stage分布:")
-            stage_counts = df_filtered["stage"].value_counts()
-            for k, v in stage_counts.items():
-                st.write(f"  · [{k}]: {v}")
-        with col3:
-            st.write("环境分布:")
-            for k, v in df_filtered["discovered_environment"].value_counts().items():
-                st.write(f"  · {k}: {v}")
+        # ========== 2. DI=0 记录详情 ==========
+        di_zero_records = debug_info.di_zero_records
+        if di_zero_records:
+            st.write(f"**📊 DI=0 记录详情（共{len(di_zero_records)}条）:**")
+            # 按原因分组统计
+            reason_group = {}
+            for rec in di_zero_records:
+                reason = rec["reason"]
+                if reason not in reason_group:
+                    reason_group[reason] = []
+                reason_group[reason].append(rec)
+
+            for reason, records in reason_group.items():
+                with st.expander(f"  {reason} ({len(records)}条)", expanded=False):
+                    for rec in records[:50]:  # 每个分组最多显示50条
+                        st.write(f"    · {rec['number']}: status=[{rec['status']}], stage=[{rec['stage']}], env=[{rec['env']}]")
+                    if len(records) > 50:
+                        st.write(f"    ... 还有 {len(records) - 50} 条")
 
         st.write("")
 
-        # DI计算结果统计
-        st.write(f"**📊 DI计算结果统计:**")
-        di_count = len(df_di_filtered) if not df_di_filtered.empty else 0
-        not_di_count = len(df_filtered) - di_count
-        st.write(f"  · DI>0（参与统计）: **{di_count}** 条")
-        st.write(f"  · DI=0（不参与统计）: **{not_di_count}** 条")
+        # ========== 3. 交付场景被排除的记录 ==========
+        delivery_excluded = debug_info.delivery_excluded
+        if delivery_excluded:
+            st.write(f"**📊 交付场景排除（HCS）({len(delivery_excluded)}条）:**")
+            for rec in delivery_excluded[:20]:
+                st.write(f"  · {rec['number']}: delivery={rec['delivery']}")
+            if len(delivery_excluded) > 20:
+                st.write(f"  ... 还有 {len(delivery_excluded) - 20} 条")
 
-        # 显示"其他"分支的记录
-        if other_cases:
-            st.write("")
-            st.write(f"**⚠️ 其他分支记录（{len(other_cases)}条）:**")
-            for case in other_cases[:20]:  # 最多显示20条
-                st.write(f"  · {case['number']}: status=[{case['status']}], stage=[{case['stage']}], env=[{case['env']}], reason={case['reason']}")
-            if len(other_cases) > 20:
-                st.write(f"  ... 还有 {len(other_cases) - 20} 条")
+        st.write("")
+
+        # ========== 4. 严重程度映射失败的记录 ==========
+        severity_failures = debug_info.severity_failures
+        if severity_failures:
+            st.write(f"**⚠️ 严重程度映射失败 ({len(severity_failures)}条）:**")
+            for rec in severity_failures[:20]:
+                st.write(f"  · {rec['number']}: severity=[{rec['severity']}]")
+            if len(severity_failures) > 20:
+                st.write(f"  ... 还有 {len(severity_failures) - 20} 条")
+
+        st.write("")
+
+        # ========== 5. SLA未超期的记录 ==========
+        sla_not_exceeded = debug_info.sla_not_exceeded
+        if sla_not_exceeded:
+            st.write(f"**📊 SLA未超期 ({len(sla_not_exceeded)}条）:**")
+            for rec in sla_not_exceeded[:20]:
+                st.write(f"  · {rec['number']}: {rec['days']}天 < {rec['threshold']}天阈值")
+            if len(sla_not_exceeded) > 20:
+                st.write(f"  ... 还有 {len(sla_not_exceeded) - 20} 条")
+
+        st.write("")
+
+        # ========== 6. 总览摘要 ==========
+        st.write("**📋 调试摘要:**")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("should_count_di原因数", len(reason_counts))
+        with col2:
+            st.metric("DI=0记录数", summary.get("di_zero_count", 0))
+        with col3:
+            st.metric("交付排除数", summary.get("delivery_excluded_count", 0))
+        with col4:
+            st.metric("SLA未超期数", summary.get("sla_not_exceeded_count", 0))
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
@@ -1025,17 +1054,14 @@ def main_content():
         # 问题单明细
         st.subheader("📄 问题单明细")
 
-        # 先清空之前的"其他"记录
-        get_other_cases()
+        # 重置debug信息，确保是本次计算的
+        reset_di_debug()
 
         # 按 DI 规则过滤
         df_di_filtered = filter_by_di_rules(df_filtered)
 
-        # 获取"其他"分支的记录
-        other_cases = get_other_cases()
-
         # 显示DI计算调试信息（统计摘要）
-        display_di_debug_info(df_all, df_filtered, df_di_filtered, other_cases)
+        display_di_debug_info(df_all, df_filtered, df_di_filtered)
 
         # 英文到中文的显示映射（与 EN_TO_CN_MAPPING 保持一致）
         en_to_cn_display = {
