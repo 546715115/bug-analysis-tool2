@@ -65,6 +65,39 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     if rename_map:
         result_df = result_df.rename(columns=rename_map)
 
+    # discovered_time 使用 created_time 的值
+    if "created_time" in result_df.columns:
+        result_df["discovered_time"] = result_df["created_time"]
+
+    # Excel status 标准化（值映射）
+    # Excel的问题状态值可能包含：待修复、待验收、待确认、定位中、修复
+    # 需要映射为di_calculator期望的status值
+    if "status" in result_df.columns:
+        status_map = {
+            "待提交": "待提交",
+            "定位中": "定位中",
+            "修复": "修复",
+            "待验收": "待验收",
+            "待确认": "待确认",
+            "已关闭": "已关闭",
+            "open": "定位中",
+            "closed": "已关闭",
+            "修复中": "修复",
+        }
+        result_df["status"] = result_df["status"].map(status_map).fillna(result_df["status"])
+
+    # Excel stage 标准化（值映射）
+    # Excel的问题阶段值：待修复、修复中、测试、修复完成
+    # 需要映射为di_calculator期望的stage值
+    if "stage" in result_df.columns:
+        stage_map = {
+            "待修复": "待修复",
+            "修复中": "修复中",
+            "测试": "修复测试",
+            "修复完成": "修复完成",
+        }
+        result_df["stage"] = result_df["stage"].map(stage_map).fillna(result_df["stage"])
+
     return result_df
 
 def merge_data(df1: pd.DataFrame, df2: pd.DataFrame) -> pd.DataFrame:
