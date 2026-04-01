@@ -405,6 +405,9 @@ if "versions" not in st.session_state:
 # 侧边栏状态：导入成功后折叠
 if "sidebar_collapsed" not in st.session_state:
     st.session_state.sidebar_collapsed = False
+# API调试信息
+if "api_debug_info" not in st.session_state:
+    st.session_state.api_debug_info = None
 
 # 如果侧边栏已折叠，提供一个按钮让用户可以重新展开
 if st.session_state.sidebar_collapsed:
@@ -463,12 +466,12 @@ def render_sidebar():
                             df_api = pd.DataFrame(all_data)
                             print(f"API 获取到 {len(df_api)} 条数据")
 
-                            # 显示API原始数据结构调试信息
+                            # 显示API原始数据结构调试信息（存储到session_state，页面刷新后显示）
                             if crawler.debug_first_item:
-                                st.write("**🔍 API原始数据keys:**")
-                                st.code(list(crawler.debug_first_item.keys()))
-                                st.write("**第一条原始数据:**")
-                                st.code(str(crawler.debug_first_item))
+                                st.session_state.api_debug_info = {
+                                    "keys": list(crawler.debug_first_item.keys()),
+                                    "first_item": crawler.debug_first_item
+                                }
 
                             # 与 Excel 数据保持一致的处理链路
                             # 1. merge_data 处理（API 单数据源，传一个空 DataFrame 作为 df1）
@@ -587,6 +590,15 @@ def render_sidebar():
 
 def main_content():
     """主页面内容"""
+
+    # 显示API原始数据结构调试信息（如果有）
+    if st.session_state.get("api_debug_info"):
+        debug_info = st.session_state.api_debug_info
+        with st.expander("🔍 API原始数据结构调试", expanded=True):
+            st.write("**API原始数据keys:**")
+            st.code(debug_info["keys"])
+            st.write("**第一条原始数据:**")
+            st.code(str(debug_info["first_item"]))
 
     # 导出弹窗
     if st.session_state.get("show_export_dialog", False):
