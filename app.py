@@ -465,11 +465,10 @@ def render_sidebar():
 
                             # 显示API原始数据结构调试信息
                             if crawler.debug_first_item:
-                                with st.expander("🔍 API原始数据结构调试", expanded=False):
-                                    st.write("**API原始数据keys:**")
-                                    st.code(list(crawler.debug_first_item.keys()))
-                                    st.write("**第一条原始数据:**")
-                                    st.code(str(crawler.debug_first_item))
+                                st.write("**🔍 API原始数据keys:**")
+                                st.code(list(crawler.debug_first_item.keys()))
+                                st.write("**第一条原始数据:**")
+                                st.code(str(crawler.debug_first_item))
 
                             # 与 Excel 数据保持一致的处理链路
                             # 1. merge_data 处理（API 单数据源，传一个空 DataFrame 作为 df1）
