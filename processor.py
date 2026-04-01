@@ -92,6 +92,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     if "stage" in result_df.columns:
         stage_map = {
             "待修复": "待修复",
+            "修改中": "修复中",
             "修复中": "修复中",
             "测试": "修复测试",
             "修复完成": "修复完成",
