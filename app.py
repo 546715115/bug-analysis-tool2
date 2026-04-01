@@ -354,11 +354,12 @@ def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di
                 reason_group[reason].append(rec)
 
             for reason, records in reason_group.items():
-                with st.expander(f"  {reason} ({len(records)}条)", expanded=False):
-                    for rec in records[:50]:  # 每个分组最多显示50条
-                        st.write(f"    · {rec['number']}: status=[{rec['status']}], stage=[{rec['stage']}], env=[{rec['env']}]")
-                    if len(records) > 50:
-                        st.write(f"    ... 还有 {len(records) - 50} 条")
+                st.write(f"  **{reason}** ({len(records)}条):")
+                for rec in records[:30]:  # 每个分组最多显示30条
+                    st.write(f"    · {rec['number']}: status=[{rec['status']}], stage=[{rec['stage']}], env=[{rec['env']}]")
+                if len(records) > 30:
+                    st.write(f"    ... 还有 {len(records) - 30} 条")
+                st.write("")
 
         st.write("")
 
