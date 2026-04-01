@@ -14,7 +14,7 @@ STATUS_MAPPING = {
     "ISSUE_STATUS_ANALYSIS": "定位中",
     "ISSUE_STATUS_FIXING": "修复",
     "ISSUE_STATUS_VERIFYING": "待验收",
-    "ISSUE_STATUS_REGRESSION_TEST": "已关闭",
+    "ISSUE_STATUS_REGRESSION_TEST": "待验收",  #   这个状态在网页就是待验收，没问题
     "ISSUE_STATUS_RETURNED": "待确认",
 }
 
@@ -146,9 +146,6 @@ class BugCrawler:
         # 处理研发责任人（优先使用 current_owners，fallback 到 develop_owners）
         current_owners = item.get("current_owners", []) or []
         develop_owners = item.get("develop_owners", []) or []
-        # Debug: 打印 owner 字段情况
-        if not current_owners and not develop_owners:
-            print(f"[DEBUG] number={item.get('number')}, keys={list(item.keys())}")
         owners = current_owners if current_owners else develop_owners
 
         # 处理 owners 可能的不同格式：列表、单个对象、或空

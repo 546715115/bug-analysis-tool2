@@ -1,7 +1,30 @@
 # di_calculator.py
 import pandas as pd
 from datetime import datetime
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+
+# 调试用：存储"其他"分支的记录
+_other_cases: List[Dict] = []
+
+
+def get_other_cases() -> List[Dict]:
+    """获取并清空其他分支记录"""
+    global _other_cases
+    cases = _other_cases.copy()
+    _other_cases = []
+    return cases
+
+
+def _add_other_case(number: str, status: str, stage: str, env: str, reason: str):
+    """记录其他分支的案例"""
+    global _other_cases
+    _other_cases.append({
+        "number": number,
+        "status": status,
+        "stage": stage,
+        "env": env,
+        "reason": reason
+    })
 
 # DI 权重配置
 SEVERITY_DI = {
@@ -115,10 +138,6 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
     stage = str(stage).strip() if not pd.isna(stage) else ""
     env = str(discovered_environment).strip() if not pd.isna(discovered_environment) else ""
 
-    # Debug: 打印"其他"分支的原始值
-    def debug_other(prefix, s, st, e):
-        print(f"[DEBUG OTHER] {prefix}: status=[{s}], stage=[{st}], env=[{e}]")
-
     # 非生产环境：除了"生产环境"之外，其他都是非生产环境
     if env != "生产环境":
         # 待提交/空 → 不统计
@@ -149,7 +168,6 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         if status == "待验收" and stage == "":
             return True, "非生产-待验收"
         # 其他情况 → 不统计
-        debug_other("非生产", status, stage, env)
         return False, "非生产-其他"
 
     # 生产环境
@@ -182,7 +200,6 @@ def should_count_di(status: str, stage: str, discovered_environment: str) -> Tup
         if status == "修复" and stage == "修复测试":
             return True, "生产-修复测试"
         # 其他情况 → 不统计
-        debug_other("生产", status, stage, env)
         return False, "生产-其他"
 
     # 环境为空或其他未知情况
@@ -208,10 +225,14 @@ def calculate_di_for_issue(row: pd.Series, current_time: datetime) -> float:
     discovered_env = row.get("discovered_environment", "")
     discovered_time = row.get("discovered_time", None)
     delivery_scenario = row.get("delivery_scenario", "")
+    number = row.get("number", "")
 
     # 1. 判断是否应该统计
     should_count, reason = should_count_di(status, stage, discovered_env)
     if not should_count:
+        # 追踪"其他"分支的记录
+        if "其他" in reason:
+            _add_other_case(number, status, stage, discovered_env, reason)
         return 0.0
 
     # 2. 交付场景判断

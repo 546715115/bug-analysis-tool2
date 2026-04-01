@@ -11,7 +11,7 @@ from processor import load_excel, merge_data, normalize_columns, get_version_lis
 from cache import save_cache, load_cache, list_caches, delete_cache
 from di_calculator import (
     calculate_cloud_di, calculate_microservice_di, calculate_microservice_di_with_count,
-    filter_production_issues, get_issue_detail_url, is_microservice
+    filter_production_issues, get_issue_detail_url, is_microservice, get_other_cases
 )
 from styles import apply_custom_styles, render_qualified_badge
 
@@ -318,10 +318,12 @@ def get_data_stats_summary(df: pd.DataFrame, df_di_filtered: pd.DataFrame) -> di
     return stats
 
 
-def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di_filtered: pd.DataFrame):
+def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di_filtered: pd.DataFrame, other_cases: list = None):
     """
     在页面上显示DI计算调试信息（统计摘要）
     """
+    if other_cases is None:
+        other_cases = []
     with st.expander("🔍 DI计算调试信息", expanded=False):
         # CCB过滤前数据统计
         st.write("**📊 CCB过滤前数据统计:**")
@@ -366,6 +368,15 @@ def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di
         not_di_count = len(df_filtered) - di_count
         st.write(f"  · DI>0（参与统计）: **{di_count}** 条")
         st.write(f"  · DI=0（不参与统计）: **{not_di_count}** 条")
+
+        # 显示"其他"分支的记录
+        if other_cases:
+            st.write("")
+            st.write(f"**⚠️ 其他分支记录（{len(other_cases)}条）:**")
+            for case in other_cases[:20]:  # 最多显示20条
+                st.write(f"  · {case['number']}: status=[{case['status']}], stage=[{case['stage']}], env=[{case['env']}], reason={case['reason']}")
+            if len(other_cases) > 20:
+                st.write(f"  ... 还有 {len(other_cases) - 20} 条")
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
@@ -1014,11 +1025,17 @@ def main_content():
         # 问题单明细
         st.subheader("📄 问题单明细")
 
+        # 先清空之前的"其他"记录
+        get_other_cases()
+
         # 按 DI 规则过滤
         df_di_filtered = filter_by_di_rules(df_filtered)
 
+        # 获取"其他"分支的记录
+        other_cases = get_other_cases()
+
         # 显示DI计算调试信息（统计摘要）
-        display_di_debug_info(df_all, df_filtered, df_di_filtered)
+        display_di_debug_info(df_all, df_filtered, df_di_filtered, other_cases)
 
         # 英文到中文的显示映射（与 EN_TO_CN_MAPPING 保持一致）
         en_to_cn_display = {
