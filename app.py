@@ -631,15 +631,15 @@ def render_sidebar():
 
 def main_content():
     """主页面内容"""
-
-    # 显示API原始数据结构调试信息（如果有）
-    if st.session_state.get("api_debug_info"):
-        debug_info = st.session_state.api_debug_info
-        with st.expander("🔍 API原始数据结构调试", expanded=True):
-            st.write("**API原始数据keys:**")
-            st.code(debug_info["keys"])
-            st.write("**第一条原始数据:**")
-            st.code(str(debug_info["first_item"]))
+#
+#     # 显示API原始数据结构调试信息（如果有）
+#     if st.session_state.get("api_debug_info"):
+#         debug_info = st.session_state.api_debug_info
+#         with st.expander("🔍 API原始数据结构调试", expanded=True):
+#             st.write("**API原始数据keys:**")
+#             st.code(debug_info["keys"])
+#             st.write("**第一条原始数据:**")
+#             st.code(str(debug_info["first_item"]))
 
     # 导出弹窗
     if st.session_state.get("show_export_dialog", False):
@@ -787,9 +787,10 @@ def main_content():
         all_microservices_qualified = ms_di_all["qualified"].all() if not ms_di_all.empty else True
         overall_qualified = cloud_di_info["qualified"] and all_microservices_qualified
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col5, col3, col4 = st.columns(5)
         col1.metric("云服务", "Cloud Eye")
-        col2.metric("总有效DI值", cloud_di_info["di"])
+        col2.metric("有效DI值", cloud_di_info["di"])
+        col5.metric("总DI值", cloud_di_info_without_ccb["di"])
         col3.metric("总问题单", cloud_di_info_without_ccb["issue_count"])
 
         # 合格标准和导出按钮都在第四列
@@ -798,7 +799,7 @@ def main_content():
             with st.popover("合格标准", use_container_width=True):
                 st.markdown("**合格标准：**")
                 st.markdown("云服务 DI < 20 **且** 微服务 DI < 5，同时满足方为合格")
-                st.markdown("")
+                st.markdown("CCB挂起:非生产环境挂起不计算DI，生产环境挂起计算DI")
                 # SLA阈值和DI权重左右排列
                 col_left, col_right = st.columns(2)
                 with col_left:
@@ -813,7 +814,6 @@ def main_content():
                     st.markdown("严重：3")
                     st.markdown("一般：1")
                     st.markdown("提示：0.1")
-                st.markdown("")
                 # 生产环境和非生产环境规则表格
                 st.markdown("**DI 统计规则**")
                 table_html = """
@@ -848,8 +848,8 @@ def main_content():
         # 图表分析
 
         # 获取微服务列表（与微服务查看问题单详情一致）
-        if "assigned_to_domain" in df_filtered.columns:
-            microservices = df_filtered["assigned_to_domain"].dropna().unique()
+        if "assigned_to_domain" in df_all_nofilter.columns:
+            microservices = df_all_nofilter["assigned_to_domain"].dropna().unique()
             ces_microservices = [ms for ms in microservices if is_microservice(ms)]
 
             # 图表筛选：微服务下拉框（有"全部"选项，默认选中全部）
@@ -864,14 +864,14 @@ def main_content():
 
             # 根据选中微服务筛选数据，"全部"时使用全部数据
             if selected_ms and selected_ms == "全部":
-                df_for_charts = df_filtered
+                df_for_charts = df_all_nofilter
             elif selected_ms and selected_ms != "暂无微服务":
-                df_for_charts = df_filtered[df_filtered["assigned_to_domain"] == selected_ms]
+                df_for_charts = df_all_nofilter[df_all_nofilter["assigned_to_domain"] == selected_ms]
             else:
-                df_for_charts = df_filtered
+                df_for_charts = df_all_nofilter
 
             # 按 DI 规则过滤（与微服务查看问题单详情一致）
-            df_for_charts = filter_by_di_rules(df_for_charts)
+            # df_for_charts = filter_by_di_rules(df_for_charts)
 
             # 获取图表数据
             chart_data = get_chart_data(df_for_charts)
@@ -894,7 +894,7 @@ def main_content():
                     )
                     fig_bar.update_traces(width=0.5, textposition="outside")
                     fig_bar.update_layout(
-                        height=270,
+                        height=425,
                         margin=dict(t=30, b=20),
                         showlegend=False,
                         xaxis_tickangle=-45,
@@ -922,7 +922,7 @@ def main_content():
                         }
                     )
                     fig_pie1.update_layout(
-                        height=270,
+                        height=425,
                         margin=dict(t=30, b=20),
                         showlegend=True,
                         legend=dict(
@@ -950,7 +950,7 @@ def main_content():
                         }
                     )
                     fig_pie2.update_layout(
-                        height=270,
+                        height=425,
                         margin=dict(t=30, b=20),
                         showlegend=True
                     )
@@ -963,7 +963,7 @@ def main_content():
         st.divider()
 
         # CES 微服务 DI 明细
-        st.subheader("📋 CES 微服务 DI 明细")
+        st.subheader("📋 CES 微服务 有效DI 明细")
 
         # 按版本过滤
         # 计算微服务 DI（包含按 DI 规则过滤后的问题单数）
@@ -1046,23 +1046,23 @@ def main_content():
             default_cols = ["问题单号", "发现环境", "标题", "严重程度", "状态"]
             # 微服务查看问题单详情可选字段
             ms_detail_all_cols = ["问题单号", "发现环境", "标题", "严重程度", "状态", "责任服务", "研发责任人", "测试责任人", "发现问题版本", "发现时间", "交付场景"]
-            aggrid_table(ms_display, default_cols, height=300, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
+            aggrid_table(ms_display, default_cols, height=400, link_column="问题单号", all_columns=ms_detail_all_cols, table_key="ms_detail")
         else:
             st.info("暂无数据")
 
         st.divider()
 
         # 问题单明细
-        st.subheader("📄 问题单明细")
+        st.subheader("📄 问题单明细-全部问题单")
 
         # 重置debug信息，确保是本次计算的
         reset_di_debug()
 
         # 按 DI 规则过滤
-        df_di_filtered = filter_by_di_rules(df_filtered)
+        df_di_filtered = df_all_nofilter
 
         # 显示DI计算调试信息（统计摘要）
-        display_di_debug_info(df_all, df_filtered, df_di_filtered)
+        # display_di_debug_info(df_all, df_filtered, df_di_filtered)
 
         # 英文到中文的显示映射（与 EN_TO_CN_MAPPING 保持一致）
         en_to_cn_display = {
@@ -1112,7 +1112,7 @@ def main_content():
             if col not in df_display.columns:
                 df_display[col] = ""
         if cols_to_show:
-            aggrid_table(df_display, cols_to_show, height=400, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
+            aggrid_table(df_display, cols_to_show, height=400, page_size=50, link_column="问题单号", all_columns=issue_detail_all_cols, table_key="issue_detail")
         else:
             st.dataframe(df_display, hide_index=True, use_container_width=True)
 
