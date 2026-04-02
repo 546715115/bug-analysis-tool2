@@ -949,6 +949,12 @@ def main_content():
                             y=0.5
                         )
                     )
+                    fig_pie1.update_traces(
+                        textinfo="value",
+                        texttemplate="%{percent} %{value}",
+                        insidetextorientation="horizontal",
+                        textfont_size=13
+                    )
                     st.plotly_chart(fig_pie1, use_container_width=True)
                 else:
                     st.info("暂无数据")
@@ -970,6 +976,12 @@ def main_content():
                         height=425,
                         margin=dict(t=30, b=20),
                         showlegend=True
+                    )
+                    fig_pie2.update_traces(
+                        textinfo="value",
+                        texttemplate="%{percent} %{value}",
+                        insidetextorientation="horizontal",
+                        textfont_size=13
                     )
                     st.plotly_chart(fig_pie2, use_container_width=True)
                 else:
