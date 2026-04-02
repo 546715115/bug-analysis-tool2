@@ -174,6 +174,11 @@ class BugCrawler:
         valid = item.get("valid")
         valid_text = "挂起" if valid == -2 else ("有效" if valid in [0, 1, -3] else "")
 
+        raw_labels = item.get("labels", [])
+        if raw_labels and isinstance(raw_labels, list):
+            labels_str = ",".join([lbl.get("name", "") if isinstance(lbl, dict) else str(lbl) for lbl in raw_labels if lbl])
+        else:
+            labels_str = ""
         return {
             "number": item.get("number", ""),
             "title": item.get("title", ""),
@@ -184,11 +189,11 @@ class BugCrawler:
             "from_version": from_version_text,
             "discover_iteration": item.get("iteration", ""),
             "created_time": item.get("created_time", ""),
-            "discovered_time": item.get("created_time", ""),  # 使用 updated_time 作为 discovered_time
+            "discovered_time": item.get("created_time", ""),
             "delivery_scenario": item.get("deliveryScenario", ""),
             "valid": valid_text,
             "discovered_environment": discovered_environment,
-            "labels": ",".join([lbl.get("name", "") for lbl in item.get("labels", []) if lbl]),
+            "labels": labels_str,
             "dev_person": dev_person,
             "testOwners": test_owners_text,
         }
