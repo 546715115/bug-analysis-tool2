@@ -271,7 +271,7 @@ EN_TO_CN_MAPPING = {
     "assigned_to_domain": "责任服务",
     "from_version": "发现问题版本",
     "discover_iteration": "发现迭代",
-    "created_time": "创建时间",
+    "created_time": "问题创建时间",
     "discovered_time": "发现时间",
     "delivery_scenario": "交付场景",
     "valid": "挂起/撤销",
@@ -280,6 +280,14 @@ EN_TO_CN_MAPPING = {
     "dev_person": "研发责任人",
     "testOwners": "测试责任人",
 }
+
+# 标准列顺序（与 Excel 导入格式完全一致）
+STANDARD_COLUMNS = [
+    "问题单号", "标题", "严重程度", "问题状态", "问题阶段",
+    "责任服务", "研发责任人", "测试责任人", "发现问题版本",
+    "发现迭代", "问题创建时间", "发现时间", "交付场景",
+    "挂起/撤销", "发现环境", "标签"
+]
 
 
 def filter_by_di_rules(df: pd.DataFrame) -> pd.DataFrame:
@@ -410,21 +418,21 @@ def display_di_debug_info(df_all: pd.DataFrame, df_filtered: pd.DataFrame, df_di
 
 
 def export_to_excel(df: pd.DataFrame, filename: str):
-    """导出 DataFrame 为 Excel 文件，带表头筛选功能，列名转中文"""
+    """导出 DataFrame 为 Excel 文件，与 Excel 导入格式完全一致"""
     output = BytesIO()
 
     # 复制数据，避免修改原 DataFrame
     df_export = df.copy()
 
-    # 将英文列名转成中文（与导入格式一致）
-    # 如果列名已经是中文则不转换
-    rename_map = {}
-    for col in df_export.columns:
-        if col in EN_TO_CN_MAPPING:
-            rename_map[col] = EN_TO_CN_MAPPING[col]
-        # 如果列名是中文但不在映射中（如 API 导入返回中文列名），保留原名
-
+    # 1. 列名 EN→CN 转换
+    rename_map = {col: EN_TO_CN_MAPPING[col] for col in df_export.columns if col in EN_TO_CN_MAPPING}
     df_export = df_export.rename(columns=rename_map)
+
+    # 2. 按标准列顺序排列，缺失列填空
+    df_export = df_export.reindex(columns=STANDARD_COLUMNS)
+
+    # 3. 空值填"空"
+    df_export = df_export.fillna("空")
 
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df_export.to_excel(writer, index=False, sheet_name='问题单明细')
@@ -449,6 +457,8 @@ if "sidebar_collapsed" not in st.session_state:
 # API调试信息
 if "api_debug_info" not in st.session_state:
     st.session_state.api_debug_info = None
+if "import_type" not in st.session_state:
+    st.session_state.import_type = ""
 
 # 如果侧边栏已折叠，提供一个按钮让用户可以重新展开
 if st.session_state.sidebar_collapsed:
@@ -526,6 +536,7 @@ def render_sidebar():
                                 st.session_state.df_raw = merged
                                 st.session_state.versions = get_version_list(merged)
                                 st.session_state.selected_version = "全部"
+                                st.session_state.import_type = "api"
                                 st.success(f"成功获取 {len(merged)} 条问题单 (来自 {len(domain_ids)} 个 Domain)")
                                 st.session_state.sidebar_collapsed = True
                                 st.rerun()
@@ -568,6 +579,7 @@ def render_sidebar():
                                 st.session_state.df_raw = merged
                                 st.session_state.versions = get_version_list(merged)
                                 st.session_state.selected_version = "全部"
+                                st.session_state.import_type = "excel"
                                 st.success(f"成功加载 {len(merged)} 条数据")
                                 st.session_state.sidebar_collapsed = True
                                 st.rerun()
@@ -587,7 +599,7 @@ def render_sidebar():
             if st.session_state.df_raw.empty:
                 st.warning("当前没有可缓存的数据")
             else:
-                success, msg = save_cache(st.session_state.df_raw, st.session_state.versions)
+                success, msg = save_cache(st.session_state.df_raw, st.session_state.versions, st.session_state.get("import_type", "excel"))
                 if success:
                     st.success(msg)
                 else:
@@ -598,7 +610,7 @@ def render_sidebar():
         if caches:
             cache_options = [c["filename"] for c in caches]
             # 格式化显示：文件名 + 数据条数 + 时间
-            cache_labels = [f"{c['filename']} ({c['df_rows']}条)" for c in caches]
+            cache_labels = [f"{c['filename']} [{c.get('import_type', '')}] ({c['df_rows']}条)" for c in caches]
             selected_cache = st.selectbox(
                 "📂 加载缓存数据",
                 options=cache_labels,
@@ -613,6 +625,10 @@ def render_sidebar():
                     st.session_state.df_raw = cache_data["df_raw"]
                     st.session_state.versions = cache_data["versions"]
                     st.session_state.selected_version = "全部"
+                    # 从文件名解析来源类型
+                    cache_list = list_caches()
+                    selected_cache_obj = next((c for c in cache_list if c["filename"] == cache_filename), {})
+                    st.session_state.import_type = selected_cache_obj.get("import_type", "excel")
                     st.success(f"加载成功: {len(st.session_state.df_raw)} 条数据")
                     st.session_state.sidebar_collapsed = True
                     st.rerun()
@@ -624,6 +640,7 @@ def render_sidebar():
                 st.session_state.df_raw = pd.DataFrame()
                 st.session_state.versions = []
                 st.session_state.selected_version = "全部"
+                st.session_state.import_type = ""
                 st.success("已卸载数据")
                 st.rerun()
         else:
@@ -963,7 +980,7 @@ def main_content():
         st.divider()
 
         # CES 微服务 DI 明细
-        st.subheader("📋 CES 微服务 有效DI 明细")
+        st.subheader("📋 CES 微服务组 有效DI 明细")
 
         # 按版本过滤
         # 计算微服务 DI（包含按 DI 规则过滤后的问题单数）
@@ -1009,7 +1026,7 @@ def main_content():
         st.divider()
 
         # 微服务查看问题单详情（作为独立区块）
-        st.subheader("🔍 微服务查看问题单详情")
+        st.subheader("🔍 微服务组查看问题单详情")
 
         if "assigned_to_domain" in df_filtered.columns:
             microservices = df_filtered["assigned_to_domain"].dropna().unique()
