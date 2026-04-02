@@ -763,9 +763,10 @@ def main_content():
         df_filtered = filter_by_version(df_all, st.session_state.selected_version)
 
         # 云服务概览
-        st.subheader("☁️ 云服务 DI 概览")
+        st.subheader("☁️ 云服务 问题单 概览")
+        st.markdown('<a name="cloud_issue_overview"></a>', unsafe_allow_html=True)
 
-        # 版本过滤（移至云服务DI概览下方）
+        # 版本过滤（移至云服务问题单概览下方）
         st.markdown('<p style="font-size:1.2rem; font-weight:bold;">🔍 发 现 问 题 版 本</p>', unsafe_allow_html=True)
         if st.session_state.versions:
             version_options = ["全部"] + sorted(st.session_state.versions)
@@ -808,7 +809,12 @@ def main_content():
         col1.metric("云服务", "Cloud Eye")
         col2.metric("有效DI值", cloud_di_info["di"])
         col5.metric("总DI值", cloud_di_info_without_ccb["di"])
-        col3.metric("总问题单", cloud_di_info_without_ccb["issue_count"])
+        col3.markdown(
+            f'<div style="font-size:0.875rem; margin-bottom:0.25rem;">总问题单</div>'
+            f'<a href="#issue_detail" style="font-size:2rem; font-weight:600; color:inherit; text-decoration:none;">'
+            f'{cloud_di_info_without_ccb["issue_count"]}</a>',
+            unsafe_allow_html=True
+        )
 
         # 合格标准和导出按钮都在第四列
         with col4:
@@ -1082,7 +1088,14 @@ def main_content():
         st.divider()
 
         # 问题单明细
-        st.subheader("📄 问题单明细-全部问题单")
+        st.markdown(
+            '<span style="font-size:1.75rem;font-weight:bold;">📄 问题单明细-全部问题单</span>'
+            '<span style="margin-left:0.5rem;font-size:0.875rem;">'
+            '<a href="#cloud_issue_overview">↑ 问题单概览</a>'
+            '</span>'
+            '<a name="issue_detail"></a>',
+            unsafe_allow_html=True
+        )
 
         # 重置debug信息，确保是本次计算的
         reset_di_debug()
