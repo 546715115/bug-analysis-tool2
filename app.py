@@ -867,6 +867,7 @@ def main_content():
             if st.button("📥 导出版本有效DI-Excel", use_container_width=True):
                 if not st.session_state.df_raw.empty:
                     st.session_state.show_export_dialog = True
+                    st.rerun()
 
         # 图表分析
 
